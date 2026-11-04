@@ -1,239 +1,354 @@
-﻿# Architecture — Implemented Through Phase 4
+# System Architecture
 
-## 1. Scope
+## 1. Overview
 
-This document records the architecture implemented through Phase 4 of the AI-Powered ERP Assistant project.
+The AI-Powered ERP Assistant is a multi-tenant application consisting of:
 
-The project is being developed in eight phases. This document does not describe planned later-phase features as completed functionality.
+- Angular 21 frontend.
+- FastAPI backend.
+- MySQL 8 relational database.
+- Ollama-hosted language model.
+- Controlled AI tool-execution layer.
 
-The target environment includes an existing ERP platform using Java Spring Boot, MySQL and Angular. The current repository provides an independent FastAPI backend and an Angular project. A complete production integration with the existing ERP is not claimed at this stage.
+The backend is responsible for authentication, authorization, tenant isolation, business logic and database access.
 
-## 2. Technology stack
+The AI component interprets natural-language questions and selects from a fixed set of approved backend tools. It does not directly query the database.
 
-### Frontend
-- Angular 21
-- TypeScript
-- SCSS
-
-### Backend
-- Python 3.12+
-- FastAPI
-- SQLAlchemy 2
-- Pydantic
-- Alembic
-
-### Database
-- MySQL 8
-- InnoDB
-- Tenant-aware relational schema
-
-### Authentication and security
-- JWT access tokens
-- Argon2 password hashing
-- Centralized role-permission definitions
-- Tenant-scoped repository queries
-
-### Infrastructure and testing
-- Docker Compose
-- Pytest
-- Ruff
-
-### AI configuration
-The project configuration includes Ollama and `qwen2.5:7b-instruct`. The AI query API and end-to-end assistant workflow are not part of the completed Phase 4 implementation.
-
-## 3. High-level architecture
+## 2. High-Level Architecture
 
 ```text
-                 Angular Frontend
-                        |
-                        | HTTP / REST
-                        v
-                 FastAPI Application
-                        |
-             +----------+----------+
-             |          |          |
-             v          v          v
-        Authentication  API      Permission
-          and JWT      Routers    Checks
-             |          |
-             |          v
-             |       Services
-             |          |
-             |          v
-             |     Repositories
-             |          |
-             +----------+
-                        |
-                        v
-                    MySQL 8
-```
++---------------------------+
+|     Angular 21 Frontend   |
+| Login, Dashboard, ERP UI  |
++-------------+-------------+
+              |
+              | REST API + JWT
+              v
++---------------------------+
+|       FastAPI Backend     |
+|                           |
+|  +---------------------+  |
+|  | Authentication      |  |
+|  | Authorization       |  |
+|  | Tenant Validation   |  |
+|  +---------------------+  |
+|                           |
+|  +---------------------+  |
+|  | API Routers         |  |
+|  | Auth, Sales,        |  |
+|  | Purchase, Inventory |  |
+|  | Dashboard, AI       |  |
+|  +---------------------+  |
+|             |             |
+|  +---------------------+  |
+|  | Service Layer       |  |
+|  +---------------------+  |
+|             |             |
+|  +---------------------+  |
+|  | Repository Layer    |  |
+|  +---------------------+  |
++-------------+-------------+
+              |
+              v
++---------------------------+
+|         MySQL 8           |
+| Tenant-scoped ERP records |
++---------------------------+
 
-The diagram represents the implemented Phase 4 request and data-access flow. It does not imply that the AI assistant workflow is already connected.
+3. Backend Layer Responsibilities
+API Layer
+FastAPI routers expose versioned REST endpoints under /api/v1.
 
-## 4. Backend layers
-
-### API routers
-
-The versioned API routers are registered under `/api/v1`.
-
-Implemented areas:
-
-- Authentication
-- Dashboard
-- Sales
-- Purchases
-- Inventory
-- Vendors
-- Customers
-
-Routers validate request parameters, obtain the authenticated user and pass the user's tenant identity and role to the service layer.
-
-### Core security and permissions
-
-The authentication dependency validates the JWT and loads an active user within the token's tenant. The tenant must also be active.
-
-A centralized permission map defines access by role. Services check the permissions required for their operations.
-
-### Service layer
-
-Services contain business-level authorization and validation.
+Responsibilities:
+- Validate request data.
+- Resolve authenticated users.
+- Apply permission dependencies.
+- Call the appropriate service.
+- Return validated response schemas.
+Authentication and Authorization
+The authentication layer:
+- Validates login credentials.
+- Generates JWT access tokens.
+- Validates incoming Bearer tokens.
+- Resolves the active user and tenant.
+- Checks role-based permissions.
+Tenant identity is obtained from the authenticated backend user, not from a tenant ID supplied by the frontend or AI model.
+Service Layer
+Services implement application business logic.
 
 Examples:
+- Authentication service.
+- Dashboard service.
+- Inventory service.
+- Sales and purchase services.
+- Vendor and customer services.
+Services apply business rules and coordinate repository operations.
+Repository Layer
+Repositories contain database access logic using SQLAlchemy.
 
-- Dashboard services enforce analytics permissions.
-- Sales and purchase services validate date ranges.
-- Inventory services control whether procurement-specific fields are included.
-- Vendor and customer services apply their respective read permissions.
+Responsibilities:
+- Retrieve ERP records.
+- Apply tenant filters.
+- Perform aggregate calculations.
+- Support pagination and filtering.
+- Avoid exposing records belonging to other tenants.
+4. Database Architecture
+The application uses MySQL 8 with InnoDB.
 
-### Repository layer
+Main database entities include:
+Entity    Purpose
+tenants    Company or tenant records
+users    User accounts and roles
+customers    Customer information
+inventory    Stock and item information
+vendors    Vendor information
+vendor_items    Vendor-item relationships
+sales_orders    Sales order headers
+sales_order_items    Sales order line items
+purchase_orders    Purchase order headers
+purchase_order_items    Purchase order line items
 
-Repositories perform database access using SQLAlchemy.
+Business records are associated with tenants. Queries must be scoped to the authenticated user's tenant.
 
-Business-data repository operations use the authenticated tenant ID as a filter. List operations apply pagination and supported filters.
+SQLAlchemy models define the relational schema. Alembic manages database migrations.
+5. Multi-Tenant Request Flow
+Client Request
+      |
+      v
+JWT Bearer Token
+      |
+      v
+Token Validation
+      |
+      v
+Authenticated User
+      |
+      v
+Resolve User Tenant
+      |
+      v
+Check Required Permission
+      |
+      v
+Tenant-Scoped Service
+      |
+      v
+Tenant-Scoped Repository Query
+      |
+      v
+MySQL Result
+      |
+      v
+Validated API Response
 
-## 5. Database structure
 
-The initial database migration creates these ten business and identity tables:
+The backend must never trust a client-provided tenant ID as the source of authorization context.
+6. Role-Based Access Control
+Four roles are implemented:
+- Administrator
+- Sales Executive
+- Purchase Executive
+- Management
+Permissions are defined centrally and checked by backend dependencies and application services.
 
-1. `tenants`
-2. `users`
-3. `customers`
-4. `inventory`
-5. `vendors`
-6. `vendor_items`
-7. `sales_orders`
-8. `sales_order_items`
-9. `purchase_orders`
-10. `purchase_order_items`
+The general access boundaries are:
+Area    Administrator    Sales    Purchase    Management
+Dashboard    Yes    Yes    Yes    Yes
+Sales    Yes    Yes    No    Yes
+Purchase    Yes    No    Yes    Yes
+Inventory    Yes    Yes    Yes    Yes
+Vendors    Yes    No    Yes    Yes
+Customers    Yes    Yes    No    Yes
+AI Query    Yes    Yes    Yes    Yes
 
-The schema uses MySQL InnoDB, tenant-aware relationships and composite tenant constraints where defined in the migration.
+The exact permissions are documented in security.md.
+7. Dashboard Analytics Flow
+Dashboard requests follow this path:
+Angular Dashboard
+       |
+       v
+Dashboard API
+       |
+       v
+Authentication and Permission Check
+       |
+       v
+Dashboard Service
+       |
+       v
+Dashboard Repository
+       |
+       v
+Tenant-Scoped SQL Aggregations
+       |
+       v
+Dashboard Response
 
-Important database design characteristics include:
 
-- Tenant-scoped username uniqueness.
-- Tenant-scoped SKU uniqueness.
-- Tenant-aware order and order-item relationships.
-- `DECIMAL(15,2)` for monetary values.
-- Alembic-managed schema migration.
+The dashboard calculates values from database records rather than hardcoded demonstration metrics.
 
-## 6. Authentication and request flow
+Available analytics include:
+- Total sales.
+- Total purchase value.
+- Sales order count.
+- Inventory item count.
+- Low-stock item count.
+- Monthly sales trend.
+- Top-selling products.
+- Top vendors.
+Analytics are permission-aware. Users do not receive restricted business metrics merely because they can access the dashboard.
 
-1. A client sends login credentials to the authentication endpoint.
-2. The backend validates the credentials.
-3. The backend issues a JWT access token after successful authentication.
-4. The client sends the token using the Bearer authorization scheme.
-5. The authentication dependency validates the token and loads the active user and tenant.
-6. The router passes the authenticated user's tenant ID and role to the service.
-7. The service checks the required permission.
-8. The repository executes tenant-scoped database queries.
-9. The service returns validated response data.
+The sales trend endpoint supports a maximum of 120 records.
+8. AI Assistant Architecture
+The AI assistant is exposed through:
 
-Tenant identity for business-data access is derived from the authenticated server-side user, not from a client-supplied tenant filter.
+POST /api/v1/ai/query
 
-## 7. Dashboard calculation rules
+Its implementation is organized into:
+- API route: backend/app/api/v1/ai.py
+- Request and response schemas: backend/app/schemas/ai.py
+- Orchestrator: backend/app/ai/orchestrator.py
+- Ollama client: backend/app/ai/llm/ollama_client.py
+- System prompt: backend/app/ai/prompts/system_prompt.py
+- Tool schemas: backend/app/ai/tools/schemas.py
+- Tool executor: backend/app/ai/tools/executor.py
+AI Request Flow
+Natural Language Question
+          |
+          v
+POST /api/v1/ai/query
+          |
+          v
+Authentication and ai:query Permission
+          |
+          v
+AI Orchestrator
+          |
+          v
+Ollama Tool Selection
+          |
+          v
+Pydantic Validation
+          |
+          v
+Approved Tool Executor
+          |
+          v
+Existing ERP Services
+          |
+          v
+Tenant-Scoped Repositories
+          |
+          v
+MySQL
+          |
+          v
+Formatted AI Response
 
-Dashboard financial metrics use completed records only.
 
-- Total sales: sum of `total_amount` for the tenant's completed sales orders.
-- Total purchase value: sum of `total_amount` for the tenant's completed purchase orders.
-- Sales order count: count of completed sales orders.
-- Inventory item count: count of active inventory records.
-- Low-stock count: active inventory records where `stock_level <= reorder_level`.
-- Sales trend: monthly aggregation of completed sales orders using `order_date`.
-- Top products: completed sales order items grouped by inventory item and summed by quantity.
-- Top vendors: completed purchase orders grouped by vendor and summed by purchase value.
+If Ollama is unavailable or its response is invalid, the orchestrator can use a keyword-based fallback classifier.
+Approved AI Tools
+The tool-selection schema permits only:
+Tool    Responsibility
+dashboard_summary    Dashboard metrics
+sales_trend    Monthly sales trend
+top_products    Best-selling products
+top_vendors    Vendor purchase ranking
+inventory    Inventory information
+low_stock    Low-stock items
 
-The sales and purchase list APIs are not restricted to completed orders. They return records matching their tenant, date and pagination filters.
+Tool arguments are validated using Pydantic. The configured limit is restricted to 1–10.
+AI Security Boundary
+The language model is not an authorization authority.
+- The authenticated user determines tenant identity.
+- The authenticated user determines role.
+- The backend validates tool selection.
+- Existing backend services enforce permissions.
+- The tool executor uses approved services and repositories.
+- Arbitrary SQL execution is not permitted.
+- Inventory results use an explicit response-field allowlist.
+- User questions are treated as untrusted input.
+The model selects an operation; the backend retrieves and authorizes the actual ERP data.
+9. Ollama Deployment
+Ollama runs separately on the host machine.
 
-## 8. Role-based data access
+Configured model:
 
-The permission map currently defines these roles:
+qwen2.5:1.5b
 
-- `Administrator`
-- `Sales Executive`
-- `Purchase Executive`
-- `Management`
+Configured API endpoint:
 
-Sales and purchase analytics, inventory procurement fields, vendor data and customer data are protected by their respective permissions.
+http://localhost:11434
 
-The current permission map grants all defined permissions to Administrator and Management. The Sales Executive and Purchase Executive have different access scopes. See [Security](security.md) for the Phase 4 permission matrix.
+When the backend runs inside Docker, it connects to the host Ollama service through:
 
-## 9. Current implementation boundary
+http://host.docker.internal:11434
 
-Completed through Phase 4:
+The Ollama client uses a 20-second request timeout and requests structured JSON output.
 
-- Database foundation and migration.
-- Authentication and tenant-aware user lookup.
-- Centralized permission definitions.
-- Dashboard, sales, purchases, inventory, vendors and customers APIs.
-- Integration and security test coverage for these APIs.
+Ollama is not started by the project's Docker Compose configuration.
+10. Frontend Architecture
+The Angular frontend provides:
+- Login.
+- Dashboard.
+- Sales.
+- Purchases.
+- Inventory.
+- Vendors.
+- Customers.
+Authentication uses an HTTP interceptor to attach the Bearer token to API requests.
 
-Not represented as completed:
+Authentication and role-based route guards control frontend navigation. These controls improve the user experience but do not replace backend authorization.
 
-- AI query endpoint.
-- End-to-end RAG or AI assistant workflow.
-- Full production integration with the existing Spring Boot ERP.
-- Final project acceptance and delivery.
+The access token is currently stored in browser sessionStorage.
 
-The architecture documentation will be expanded after subsequent phases are implemented and verified.
+The current frontend does not include an AI chat interface. AI functionality is available through the backend API.
+11. Deployment Architecture
+The Docker Compose configuration starts:
+- MySQL 8 database.
+- FastAPI backend.
+The Angular application is started separately using the Angular development server.
 
-10. Phase 5 — Angular frontend architecture
-Phase 5 implements the Angular client for the existing FastAPI APIs.
-Frontend structure
-The Angular application uses standalone components and is organized into:
-- core/auth: authentication-related functionality.
-- core/guards: authentication and role-based route guards.
-- core/interceptors: HTTP authentication interceptor.
-- core/models: authentication, dashboard and ERP response models.
-- core/services: authentication, dashboard and ERP API services.
-- features/auth: login page.
-- features/dashboard: dashboard page.
-- features/sales: sales orders page.
-- features/purchases: purchase orders page.
-- features/inventory: inventory page.
-- features/vendors: vendors page.
-- features/customers: customers page.
-- layout: authenticated application layout and navigation.
-Frontend request flow
-1. The user submits tenant code, username and password on the login page.
-2. Angular calls POST /api/v1/auth/login.
-3. The access token is stored in browser sessionStorage.
-4. Angular calls GET /api/v1/auth/me to load the authenticated user's profile.
-5. The HTTP interceptor attaches the Bearer token to protected API requests.
-6. The authentication guard protects the application routes.
-7. The role guard checks the role allowed by route metadata.
-8. The layout displays only the navigation items allowed for the loaded role.
-9. Feature services call the corresponding FastAPI endpoints.
-10. The backend performs the actual authentication, permission and tenant checks.
-Local development proxy
-frontend/proxy.conf.json forwards requests beginning with /api to http://127.0.0.1:8000. This avoids requiring browser-side cross-origin configuration for the local Angular development workflow.
+Ollama also runs separately on the host machine.
+Host Machine
+|
++-- Docker Compose
+|   |
+|   +-- MySQL 8
+|   |
+|   +-- FastAPI Backend
+|
++-- Ollama Service
+|
++-- Angular Development Server
 
-This development proxy is not a production reverse-proxy or deployment architecture.
-Authorization boundary
-Frontend route guards and hidden navigation items improve the user experience but are not security controls by themselves. A user can attempt to call an API directly. Therefore, the FastAPI backend must continue enforcing permissions and tenant-scoped access for every protected operation.
 
-The browser does not determine the tenant ID used for business-data access.
-Phase 5 scope boundary
-The implemented frontend provides read-oriented ERP pages and dashboard views using the existing backend APIs. It does not introduce new backend business endpoints, order creation workflows, an AI chat interface or production Spring Boot integration.
+This is a local development arrangement, not a production deployment topology.
+12. Spring Boot Integration Boundary
+The target ERP environment may contain an existing Spring Boot application.
 
-The AI assistant remains planned for a later phase.
+This repository currently provides a FastAPI service and documented REST API contracts. It does not claim a completed live integration with an existing Spring Boot deployment.
+
+A production integration would need:
+- Agreed service-to-service authentication.
+- Trusted identity and tenant propagation.
+- API gateway or network configuration.
+- Error and timeout handling.
+- Integration tests against the actual Spring Boot system.
+Refer to api-contracts.md for the documented API boundary.
+13. Technology Summary
+Component    Technology
+Frontend    Angular 21
+Language    TypeScript
+Backend    Python 3.12+, FastAPI
+ORM    SQLAlchemy 2
+Validation    Pydantic
+Database    MySQL 8, InnoDB
+Migrations    Alembic
+Authentication    JWT Bearer
+Password Hashing    Argon2
+AI Runtime    Ollama
+AI Model    qwen2.5:1.5b
+Containers    Docker Compose
+Backend Testing    Pytest
+Linting    Ruff

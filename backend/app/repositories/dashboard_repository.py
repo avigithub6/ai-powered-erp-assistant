@@ -61,7 +61,7 @@ class DashboardRepository:
             "low_stock_count": low_stock_count,
         }
 
-    def get_sales_trend(self, tenant_id: int):
+    def get_sales_trend(self, tenant_id: int, limit: int = 120):
         year = extract("year", SalesOrder.order_date)
         month = extract("month", SalesOrder.order_date)
 
@@ -77,6 +77,7 @@ class DashboardRepository:
             )
             .group_by(year, month)
             .order_by(year, month)
+            .limit(limit)
         )
 
         rows = self.db.execute(statement).all()

@@ -35,11 +35,16 @@ def get_summary(
 
 @router.get("/sales-trend", response_model=list[SalesTrendItem])
 def get_sales_trend(
+    limit: int = Query(default=120, ge=1, le=120),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     service = get_dashboard_service(db)
-    return service.get_sales_trend(current_user.tenant_id, current_user.role)
+    return service.get_sales_trend(
+        current_user.tenant_id,
+        current_user.role,
+        limit,
+    )
 
 
 @router.get("/top-products", response_model=list[TopProductItem])

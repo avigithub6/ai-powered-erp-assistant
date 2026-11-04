@@ -1,293 +1,430 @@
 ﻿# AI-Powered ERP Assistant
 
-A multi-tenant ERP assistant project built with Angular, FastAPI, MySQL and Ollama.
+A multi-tenant ERP analytics and AI assistant built with Angular 21, FastAPI, MySQL 8 and Ollama.
 
-This repository is being developed in eight controlled phases. This document describes the implementation completed through **Phase 4** only. Features planned for later phases are not represented as completed.
+The application provides role-based ERP dashboards, sales and purchase analytics, inventory visibility, tenant isolation and natural-language queries through a controlled AI tool-execution layer.
 
-## Current implementation status
+## Project Status
 
-### Completed through Phase 4
+| Phase | Scope | Status |
+|---|---|---|
+| Phase 1 | Project foundation and database schema | Completed |
+| Phase 2 | Authentication and tenant isolation | Completed |
+| Phase 3 | Role-based permissions and business APIs | Completed |
+| Phase 4 | Dashboard analytics and backend integration tests | Completed |
+| Phase 5 | Angular frontend | Completed |
+| Phase 6 | AI assistant and controlled tool integration | Completed |
+| Phase 7 | Final documentation and submission readiness audit | In progress |
 
-- Initial project architecture and backend foundation.
-- MySQL database schema and Alembic migration.
-- JWT-based authentication and authenticated-user lookup.
-- Tenant-aware data access.
-- Centralized role-permission definitions.
-- Dashboard summary and analytics APIs.
-- Sales order list and detail APIs.
-- Purchase order list and detail APIs.
-- Inventory list and detail APIs.
-- Vendor list and detail APIs.
-- Customer list and detail APIs.
-- Integration and security tests for the implemented APIs.
+## Technology Stack
 
-### Not yet completed
+### Frontend
+- Angular 21
+- TypeScript
+- SCSS
+- RxJS
+- Angular Router and HTTP Interceptors
 
-- AI query endpoint and end-to-end AI assistant workflow.
-- Later-phase functionality and final ERP integration.
-- Final project acceptance and delivery documentation.
+### Backend
+- Python 3.12+
+- FastAPI
+- SQLAlchemy 2
+- Pydantic
+- Alembic
+- HTTPX
 
-The `ai:query` permission is currently present in the permission map, but this does not mean an AI query API has been implemented.
+### Database
+- MySQL 8
+- InnoDB
+- Tenant-aware relational schema
 
-## Technology stack
+### AI
+- Ollama
+- `qwen2.5:1.5b`
+- Pydantic-validated tool selection
+- Controlled backend tool execution
+- Keyword-based fallback when the LLM is unavailable or returns an invalid response
 
-| Area | Technology |
-|---|---|
-| Frontend | Angular 21, TypeScript |
-| Backend | Python 3.12+, FastAPI |
-| ORM | SQLAlchemy 2 |
-| Validation | Pydantic |
-| Database | MySQL 8, InnoDB |
-| Migrations | Alembic |
-| Authentication | JWT |
-| Password hashing | Argon2 |
-| AI model server configuration | Ollama |
-| Configured model | qwen2.5:7b-instruct |
-| Testing | Pytest |
-| Code quality | Ruff |
-| Containerization | Docker Compose |
+### Security and Quality
+- JWT Bearer authentication
+- Argon2 password hashing
+- Centralized role-permission definitions
+- Tenant-scoped database queries
+- Pytest
+- Ruff
+- Docker Compose
 
-Ollama and the model are part of the project configuration. The Phase 4 API implementation does not yet provide an end-to-end AI query workflow.
-
-## Project structure
+## Architecture Overview
 
 ```text
+Angular 21 Frontend
+        |
+        | HTTP / REST + JWT
+        v
+FastAPI Backend
+        |
+        +----------------------+
+        |                      |
+        v                      v
+ Authentication          ERP API Routers
+ and Authorization             |
+        |                       |
+        |                 Service Layer
+        |                       |
+        |                 Repository Layer
+        |                       |
+        |                       v
+        |                    MySQL 8
+        |
+        v
+ AI Query Endpoint
+        |
+        v
+ AI Orchestrator
+        |
+        +----------------------+
+        |                      |
+        v                      v
+   Ollama LLM             Fallback Classifier
+        |                      |
+        +----------+-----------+
+                   |
+                   v
+          Validated Tool Selection
+                   |
+                   v
+             Tool Executor
+                   |
+                   v
+       Authorized Backend Services
+                   |
+                   v
+                 MySQL
+
+The AI model selects an approved tool. The backend validates the selection, enforces permissions and retrieves data through existing services and repositories. The model does not execute arbitrary SQL or directly access the database.
+Main Features
+Authentication
+- Login using tenant code, username and password.
+- JWT access token generation.
+- Authenticated user profile endpoint.
+- Active user and tenant validation.
+- Argon2 password hashing.
+Multi-Tenant Data Isolation
+- Business data is scoped to the authenticated user's tenant.
+- Tenant identity is derived from the validated backend user.
+- Client-supplied tenant IDs cannot override the authenticated tenant context.
+- Individual record lookups use tenant-scoped queries.
+Role-Based Access Control
+Four application roles are implemented:
+Role    Access
+Administrator    All defined ERP permissions
+Sales Executive    Sales, customers, dashboard and general inventory
+Purchase Executive    Purchases, vendors, dashboard and procurement inventory
+Management    All defined ERP permissions and analytics
+
+The backend enforces permissions. Frontend route guards and navigation visibility are user-interface controls only.
+ERP APIs
+- Authentication and user profile.
+- Dashboard summary and analytics.
+- Sales orders.
+- Purchase orders.
+- Inventory.
+- Vendors.
+- Customers.
+Dashboard Analytics
+- Total sales.
+- Total purchase value.
+- Completed sales order count.
+- Inventory item count.
+- Low-stock item count.
+- Monthly sales trend.
+- Top-selling products.
+- Top vendors.
+- Paginated inventory and low-stock records.
+Financial dashboard calculations use completed orders only. Sales and purchase list endpoints can return orders with other statuses.
+AI Assistant
+The AI assistant accepts natural-language ERP questions through:
+
+POST /api/v1/ai/query
+
+Example request:
+{
+  "question": "Show me the low stock items"
+}
+
+
+The request accepts a question between 2 and 1000 characters and rejects additional fields.
+
+The response schema contains:
+- answer
+- tool_used
+- source
+- data
+The assistant supports six approved tools:
+Tool    Purpose
+dashboard_summary    Overall dashboard metrics
+sales_trend    Monthly sales trend
+top_products    Best-selling products
+top_vendors    Vendor purchase ranking
+inventory    Inventory and available stock
+low_stock    Items requiring reorder attention
+
+AI execution safeguards:
+- Ollama returns structured JSON for tool selection.
+- Pydantic validates the selected tool and arguments.
+- Only the six approved tools can be selected.
+- Tool limits are restricted to 1–10.
+- The backend supplies tenant identity and role from the authenticated user.
+- Existing backend services enforce the relevant permissions.
+- Inventory output uses an explicit field allowlist and excludes procurement-only fields.
+- The system prompt treats the user question as untrusted input.
+- Ollama requests use a 20-second timeout.
+- Keyword-based fallback selection is available if Ollama is unavailable or its response is invalid.
+- The model does not generate business figures or execute SQL.
+The source response field identifies whether tool selection came from ollama or fallback.
+Repository Structure
 AI-powered ERP Assistant/
-├── backend/
-│   ├── alembic/
-│   ├── app/
-│   │   ├── api/
-│   │   ├── core/
-│   │   ├── db/
-│   │   ├── models/
-│   │   ├── repositories/
-│   │   ├── schemas/
-│   │   ├── security/
-│   │   └── services/
-│   ├── tests/
-│   │   ├── integration/
-│   │   └── security/
-│   ├── Dockerfile
-│   └── requirements.txt
-├── docs/
-│   ├── api-contracts.md
-│   ├── architecture.md
-│   └── security.md
-├── frontend/
-├── scripts/
-├── .env.example
-├── docker-compose.yml
-└── README.md
-```
+|
++-- backend/
+|   +-- app/
+|   |   +-- ai/
+|   |   |   +-- llm/
+|   |   |   +-- prompts/
+|   |   |   +-- tools/
+|   |   |   +-- orchestrator.py
+|   |   +-- api/
+|   |   +-- core/
+|   |   +-- db/
+|   |   +-- models/
+|   |   +-- repositories/
+|   |   +-- schemas/
+|   |   +-- services/
+|   +-- alembic/
+|   +-- tests/
+|   +-- Dockerfile
+|
++-- frontend/
+|   +-- src/
+|   +-- package.json
+|   +-- proxy.conf.json
+|
++-- docs/
+|   +-- architecture.md
+|   +-- api-contracts.md
+|   +-- security.md
+|
++-- docker-compose.yml
++-- .env.example
++-- .gitignore
++-- README.md
 
-## Prerequisites
 
-For the Docker-based backend setup:
-
+Prerequisites
+Install the following:
+- Python 3.12 or later.
+- Node.js and npm compatible with the Angular 21 project.
 - Docker Desktop with Docker Compose.
+- Ollama installed on the host machine.
 - Git.
-- Internet access to download the required container images.
-
-For running the Angular development server separately:
-
-- Node.js and npm.
-
-## Backend setup with Docker Compose
-
-Run these commands from the project root.
-
-### 1. Clone the repository
-
-```powershell
-git clone https://github.com/avigithub6/ai-powered-erp-assistant.git
-cd ai-powered-erp-assistant
-```
-
-### 2. Create the environment file
-
-```powershell
+Environment Configuration
+Create the local environment file:
 Copy-Item .env.example .env
-```
 
-Open `.env` and configure secure values for:
 
-- `MYSQL_PASSWORD`
-- `MYSQL_ROOT_PASSWORD`
-- `JWT_SECRET_KEY`
+Update .env with appropriate local values.
 
-Do not use production credentials in a committed environment file. Do not commit `.env`.
+Important settings:
+Variable    Purpose
+APP_NAME    Application name
+APP_VERSION    Application version
+API_V1_PREFIX    Backend API prefix
+DEBUG    Debug mode; disable in production
+MYSQL_DATABASE    MySQL database name
+MYSQL_USER    MySQL application user
+MYSQL_PASSWORD    MySQL application password
+MYSQL_ROOT_PASSWORD    MySQL root password
+DATABASE_URL    Local database connection URL
+OLLAMA_BASE_URL    Ollama endpoint
+OLLAMA_MODEL    Ollama model name
+JWT_SECRET_KEY    JWT signing secret
+JWT_ALGORITHM    JWT signing algorithm
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES    JWT lifetime in minutes
 
-The supplied `.env.example` contains local-development configuration. Docker Compose configures the backend database hostname as the MySQL service name.
+The Docker Compose backend database URL uses MYSQL_PASSWORD_URLENCODED. Define this variable in .env with the URL-encoded form of the database password, especially when it contains reserved URL characters.
 
-### 3. Start the containers
+Use strong, unique secrets. Never commit .env or production credentials.
+Run the Application
+1. Start Ollama on the host
+Ollama is not a Docker Compose service in this project. It runs separately on the host machine.
 
-```powershell
+Pull the configured model:
+ollama pull qwen2.5:1.5b
+
+
+Verify the model:
+ollama list
+
+
+Make sure the Ollama service is running and accessible at:
+
+http://localhost:11434
+
+The Dockerized backend connects to the host Ollama service through:
+
+http://host.docker.internal:11434
+2. Start MySQL and the backend
+From the repository root:
 docker compose up --build -d
-```
 
-Check container status:
 
-```powershell
+Check service status:
 docker compose ps
-```
 
-### 4. Apply database migrations
 
-After the backend container is running:
+View backend logs:
+docker compose logs -f backend
 
-```powershell
+
+3. Apply database migrations
 docker compose exec backend alembic upgrade head
-```
 
-### 5. Download the configured Ollama model
 
-The Compose configuration starts the Ollama service, but does not automatically download the model.
+Check the current migration:
+docker compose exec backend alembic current
 
-```powershell
-docker compose exec ollama ollama pull qwen2.5:7b-instruct
-```
 
-Check the downloaded model:
-
-```powershell
-docker compose exec ollama ollama list
-```
-
-### 6. Verify the backend
-
-Open:
-
-- API root: http://localhost:8000/
-- Swagger documentation: http://localhost:8000/docs
-- Health endpoint: http://localhost:8000/health
-
-The health endpoint reports backend application health. It should not be treated as proof that every future AI workflow is operational.
-
-## Frontend development server
-
-The Angular application can be run separately:
-
-```powershell
+4. Start the Angular frontend
+Open another terminal:
 cd frontend
 npm install
 npm start
-```
 
-The frontend development server normally runs at:
+
+The development server normally runs at:
 
 http://localhost:4200/
-
-The Phase 4 backend API is available at:
+5. Access the backend
+API base URL:
 
 http://localhost:8000/api/v1
 
-Frontend-to-backend integration and final UI workflows should be verified as their implementation progresses.
+Interactive API documentation:
 
-## API overview
+http://localhost:8000/docs
 
-All versioned backend endpoints use the `/api/v1` prefix.
+Health endpoint:
 
-| Area | Endpoints |
-|---|---|
-| Authentication | `POST /auth/login`, `GET /auth/me` |
-| Dashboard | `GET /dashboard/summary` |
-| Dashboard analytics | `GET /dashboard/sales-trend`, `GET /dashboard/top-products`, `GET /dashboard/top-vendors` |
-| Dashboard inventory | `GET /dashboard/inventory`, `GET /dashboard/low-stock` |
-| Sales | `GET /sales`, `GET /sales/{order_id}` |
-| Purchases | `GET /purchases`, `GET /purchases/{order_id}` |
-| Inventory | `GET /inventory`, `GET /inventory/{item_id}` |
-| Vendors | `GET /vendors`, `GET /vendors/{vendor_id}` |
-| Customers | `GET /customers`, `GET /customers/{customer_id}` |
+http://localhost:8000/health
 
-For request parameters, response fields and permission requirements, see [API Contracts](docs/api-contracts.md).
+The Angular development proxy forwards /api requests to the local FastAPI backend.
+Demo Data and Credentials
+The project uses synthetic demonstration data for testing multi-tenant access.
 
-## Business rules implemented through Phase 4
+The seeded demonstration accounts are:
+Tenant    Username    Role
+COMPANY_A    admin_a    Administrator
+COMPANY_A    sales_a    Sales Executive
+COMPANY_A    purchase_a    Purchase Executive
+COMPANY_A    manager_a    Management
+COMPANY_B    admin_b    Administrator
+COMPANY_B    sales_b    Sales Executive
 
-- Business data queries are scoped to the authenticated user's tenant.
-- Dashboard sales and purchase financial totals use orders whose status is `COMPLETED`.
-- Dashboard sales order count includes completed sales orders only.
-- Sales and purchase list endpoints can return orders of different statuses; they are not restricted to completed orders.
-- Sales and purchase date filters use `order_date` with inclusive start and end boundaries.
-- Low stock means `stock_level <= reorder_level`.
-- Inventory list endpoints return active inventory records.
-- Sales Executive inventory responses exclude procurement purchase-price information.
-- Procurement-authorized inventory responses include `purchase_price`.
-- Pagination is supported on list endpoints.
+Demonstration password:
 
-## Testing and code quality
+Demo@12345
 
-Run backend tests from the `backend` directory:
+These are development-only credentials. Do not use them in production. Confirm that the seed operation has been run before attempting login.
+API Overview
+All versioned endpoints use /api/v1.
+Area    Method and endpoints    Permission
+Authentication    POST /auth/login, GET /auth/me    Login / authenticated user
+Dashboard    GET /dashboard/summary    dashboard:read
+Sales analytics    GET /dashboard/sales-trend, GET /dashboard/top-products    sales:analytics
+Purchase analytics    GET /dashboard/top-vendors    purchase:analytics
+Inventory analytics    GET /dashboard/inventory, GET /dashboard/low-stock    inventory:read
+Sales    GET /sales, GET /sales/{order_id}    sales:read
+Purchases    GET /purchases, GET /purchases/{order_id}    purchase:read
+Inventory    GET /inventory, GET /inventory/{item_id}    inventory:read
+Vendors    GET /vendors, GET /vendors/{vendor_id}    vendors:read
+Customers    GET /customers, GET /customers/{customer_id}    customers:read
+AI Assistant    POST /ai/query    ai:query
 
-```powershell
-cd backend
-python -m pytest
-```
-
-Run Ruff:
-
-```powershell
-python -m ruff check app tests
-```
-
-Check formatting errors in Git changes from the repository root:
-
-```powershell
-git diff --check
-```
-
-**Phase 4 test status:** 51 tests were reported passing during the Phase 4 development workflow. This is the reported result for that development run, not a claim that tests have been rerun on every machine or environment.
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [API Contracts](docs/api-contracts.md)
-- [Security](docs/security.md)
-
-These documents describe the implementation through Phase 4. They will be expanded and verified as the remaining phases are completed.
-
-## Phase 5 — Angular frontend
-
-Phase 5 adds the Angular frontend and connects it to the implemented FastAPI APIs.
-
-### Implemented frontend features
-
-- Login form using tenant code, username and password.
-- JWT authentication through the backend login endpoint.
-- Authenticated user lookup through `GET /api/v1/auth/me`.
-- Bearer token attachment through an HTTP interceptor.
-- Authentication guard for protected application routes.
-- Role-based route guards and navigation visibility.
-- Dashboard with backend summary and analytics data.
+See API Contracts for request parameters, response fields and authorization details.
+Frontend
+The Angular frontend provides:
+- Login using tenant code, username and password.
+- JWT authentication and authenticated user lookup.
+- Bearer token HTTP interceptor.
+- Authentication and role-based route guards.
+- Role-aware application navigation.
+- Dashboard summary and analytics.
 - Sales orders list.
 - Purchase orders list.
-- Inventory list with low-stock filtering.
+- Inventory list and low-stock filtering.
 - Vendor list.
 - Customer list.
 - Loading, error, empty-state, refresh and pagination handling on data pages.
+The frontend stores the access token in browser sessionStorage. This is a development implementation and requires production security review.
 
-### Frontend role navigation
+The current frontend provides read-oriented ERP pages. An AI chat interface and create/update/delete ERP workflows are not claimed as implemented.
+Testing and Code Quality
+Backend tests
+From the repository root:
+cd backend
+python -m pytest
 
-| Role | Available frontend sections |
-|---|---|
-| Administrator | Dashboard, Sales, Purchases, Inventory, Vendors, Customers |
-| Sales Executive | Dashboard, Sales, Inventory, Customers |
-| Purchase Executive | Dashboard, Purchases, Inventory, Vendors |
-| Management | Dashboard, Sales, Purchases, Inventory, Vendors, Customers |
 
-Frontend role guards and navigation only control the user interface. The FastAPI backend remains responsible for authentication, tenant isolation and permission enforcement.
+Ruff
+python -m ruff check app tests
 
-### Frontend API configuration
 
-During local development, Angular uses the proxy configuration in `frontend/proxy.conf.json` to forward `/api` requests to `http://127.0.0.1:8000`.
+Frontend tests
+From the frontend directory:
+npm test
 
-The frontend does not send or select a tenant ID for business-data requests. The backend derives tenant identity from the authenticated user.
 
-The JWT access token is stored in browser `sessionStorage`. This is a development implementation and should be reviewed against the deployment security requirements before production use.
+Frontend production build
+npm run build
 
-### Run the frontend
 
-Open a terminal in the `frontend` directory:
+Git whitespace validation
+From the repository root:
+git diff --check
 
-```powershell
-npm install
-npm start
+
+Recorded development verification
+The development workflow recorded:
+- 66 backend tests passing in the full backend suite.
+- 15 AI integration tests passing in a separate AI test run.
+- 4 authentication tests passing in a separate authentication test run.
+- 10 dashboard tests passing in a separate dashboard test run.
+- Ruff checks passing.
+- 2 frontend tests passing.
+- Angular production build passing.
+These are recorded results from their respective development runs. Separate test runs may overlap and must not be added together as a unique total. Rerun the commands above in the final environment before submission.
+Security Considerations
+- Backend authorization is authoritative; frontend role checks are not security boundaries.
+- Tenant identity is derived from the authenticated backend user.
+- Database queries are tenant-scoped.
+- AI tool execution uses an allowlist and existing backend permission checks.
+- The AI model cannot execute arbitrary SQL.
+- User input is treated as untrusted.
+- Authentication and authorization events are logged without logging passwords or JWT tokens.
+- .env must remain outside version control.
+- Production deployment must use strong secrets, HTTPS, restricted database exposure and appropriate network controls.
+- Review browser token storage and XSS protections before production deployment.
+See Security for further details and known boundaries.
+Spring Boot Integration Boundary
+The target ERP environment includes an existing Java Spring Boot application.
+
+This repository provides an independently runnable FastAPI backend and Angular frontend, together with documented REST API contracts.
+
+A completed production integration with the existing Spring Boot ERP is not claimed. Service-to-service authentication, trusted identity propagation, deployment topology and production error mapping require integration-specific implementation and verification.
+
+See API Contracts for the integration boundary.
+Documentation
+- Architecture
+- API Contracts
+- Security
+License
+This repository was prepared as an ERP assistant assignment project. Add the applicable license if required by the project owner.

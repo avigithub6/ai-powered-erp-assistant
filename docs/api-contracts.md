@@ -1,314 +1,245 @@
-﻿# API Contracts — Phase 4
+# API Contracts
 
-## 1. Scope and conventions
+## 1. Overview
 
-This document describes the backend endpoints implemented through Phase 4.
+The backend exposes REST APIs using FastAPI.
 
-Base URL for local development:
+Base URL:
 
-```text
-http://localhost:8000/api/v1
-```
+`http://localhost:8000/api/v1`
 
-All endpoints below are relative to `/api/v1`.
+Interactive API documentation:
 
-Protected endpoints require:
+`http://localhost:8000/docs`
 
-```http
-Authorization: Bearer <access_token>
-```
-
-The authenticated user's tenant identity is resolved by the backend from the validated token and user record. Clients must not choose a tenant by supplying a tenant ID in a business-data request.
+Authentication uses JWT Bearer tokens for protected endpoints.
 
 ## 2. Authentication
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/auth/login` | Authenticate a user and obtain an access token |
-| GET | `/auth/me` | Return the authenticated user's information |
+### Login
 
-The login request uses the configured authentication schema, including tenant code, username and password.
+`POST /api/v1/auth/login`
 
-Example request shape:
+Authenticates a user using tenant code, username and password.
+
+Example request:
 
 ```json
 {
   "tenant_code": "COMPANY_A",
   "username": "admin_a",
-  "password": "your-password"
+  "password": "Demo@12345"
 }
-```
 
-Use actual provisioned credentials for the environment. Do not assume demo users have been seeded unless the database setup confirms it.
+The successful response contains an access token and token type.
 
-## 3. Dashboard APIs
+Use the returned token in subsequent protected requests:
 
-All dashboard endpoints require the relevant dashboard or analytics permission.
-
-| Method | Endpoint | Permission |
-|---|---|---|
-| GET | `/dashboard/summary` | `dashboard:read` |
-| GET | `/dashboard/sales-trend` | `sales:analytics` |
-| GET | `/dashboard/top-products` | `sales:analytics` |
-| GET | `/dashboard/top-vendors` | `purchase:analytics` |
-| GET | `/dashboard/inventory` | `inventory:read` |
-| GET | `/dashboard/low-stock` | `inventory:read` |
-
-### Query parameters
-
-| Endpoint | Parameter | Default | Validation |
-|---|---|---:|---|
-| `/dashboard/top-products` | `limit` | 5 | 1–100 |
-| `/dashboard/top-vendors` | `limit` | 5 | 1–100 |
-| `/dashboard/inventory` | `limit` | 20 | 1–100 |
-| `/dashboard/inventory` | `offset` | 0 | 0 or greater |
-| `/dashboard/low-stock` | `limit` | 20 | 1–100 |
-| `/dashboard/low-stock` | `offset` | 0 | 0 or greater |
-
-### Summary response fields
-
-The summary schema includes:
-
-- `total_sales`
-- `total_purchase_value`
-- `sales_order_count`
-- `inventory_item_count`
-- `low_stock_count`
-
-Financial fields are permission-aware. Users without sales analytics access do not receive the sales total and have the sales order count set to zero. Users without purchase analytics access do not receive the purchase total.
-
-Other dashboard response schemas include monthly sales trend items, top products, top vendors and paginated inventory data.
-
-## 4. Sales APIs
-
-| Method | Endpoint | Permission |
-|---|---|---|
-| GET | `/sales` | `sales:read` |
-| GET | `/sales/{order_id}` | `sales:read` |
-
-List query parameters:
-
-| Parameter | Default | Description |
-|---|---:|---|
-| `limit` | 20 | Page size, 1–100 |
-| `offset` | 0 | Number of records to skip, 0 or greater |
-| `start_date` | None | Inclusive lower bound for `order_date` |
-| `end_date` | None | Inclusive upper bound for `order_date` |
-
-The list response contains:
-
-- `items`
-- `total`
-- `limit`
-- `offset`
-
-Sales order response fields:
-
-- `id`
-- `customer_id`
-- `order_number`
-- `status`
-- `total_amount`
-- `order_date`
-
-The detail response additionally contains `items`, with:
-
-- `id`
-- `inventory_id`
-- `quantity`
-- `unit_price`
-- `line_total`
-
-The list endpoint is not restricted to completed orders. Completed-only filtering is applied to dashboard financial analytics.
-
-## 5. Purchase APIs
-
-| Method | Endpoint | Permission |
-|---|---|---|
-| GET | `/purchases` | `purchase:read` |
-| GET | `/purchases/{order_id}` | `purchase:read` |
-
-List query parameters:
-
-| Parameter | Default | Description |
-|---|---:|---|
-| `limit` | 20 | Page size, 1–100 |
-| `offset` | 0 | Number of records to skip, 0 or greater |
-| `start_date` | None | Inclusive lower bound for `order_date` |
-| `end_date` | None | Inclusive upper bound for `order_date` |
-
-The list response contains `items`, `total`, `limit` and `offset`.
-
-Purchase order response fields:
-
-- `id`
-- `vendor_id`
-- `order_number`
-- `status`
-- `total_amount`
-- `order_date`
-
-The detail response additionally contains `items`, with:
-
-- `id`
-- `inventory_id`
-- `quantity`
-- `unit_cost`
-- `line_total`
-
-The list endpoint is not restricted to completed orders. Completed-only filtering is applied to dashboard purchase-value analytics.
-
-## 6. Inventory APIs
-
-| Method | Endpoint | Permission |
-|---|---|---|
-| GET | `/inventory` | `inventory:read` |
-| GET | `/inventory/{item_id}` | `inventory:read` |
-
-List query parameters:
-
-| Parameter | Default | Description |
-|---|---:|---|
-| `limit` | 20 | Page size, 1–100 |
-| `offset` | 0 | Number of records to skip, 0 or greater |
-| `low_stock_only` | false | Return only low-stock items when true |
-
-The base sales inventory response contains exactly these fields:
-
-- `id`
-- `item_name`
-- `sku`
-- `category`
-- `stock_level`
-- `reorder_level`
-- `selling_price`
-- `unit`
-
-For users with `inventory:procurement_read`, the procurement response additionally includes `purchase_price`.
-
-The list response contains `items`, `total`, `limit` and `offset`.
-
-Low-stock logic:
-
-```text
-stock_level <= reorder_level
-```
-
-Only active inventory records are included.
-
-## 7. Vendor APIs
-
-| Method | Endpoint | Permission |
-|---|---|---|
-| GET | `/vendors` | `vendors:read` |
-| GET | `/vendors/{vendor_id}` | `vendors:read` |
-
-List query parameters:
-
-- `limit`: default 20, range 1–100.
-- `offset`: default 0, minimum 0.
-
-Vendor response fields:
-
-- `id`
-- `vendor_name`
-- `contact_person`
-- `email`
-- `phone`
-- `address`
-
-The list response contains `items`, `total`, `limit` and `offset`.
-
-## 8. Customer APIs
-
-| Method | Endpoint | Permission |
-|---|---|---|
-| GET | `/customers` | `customers:read` |
-| GET | `/customers/{customer_id}` | `customers:read` |
-
-List query parameters:
-
-- `limit`: default 20, range 1–100.
-- `offset`: default 0, minimum 0.
-
-Customer response fields:
-
-- `id`
-- `name`
-- `email`
-- `phone`
-- `address`
-
-The list response contains `items`, `total`, `limit` and `offset`.
-
-## 9. Date and financial calculation rules
-
-- Date filters apply to the relevant order's `order_date`.
-- Start and end date boundaries are inclusive.
-- A start date later than the end date is rejected with HTTP 400.
-- Dashboard sales financial calculations include only sales orders with status `COMPLETED`.
-- Dashboard purchase financial calculations include only purchase orders with status `COMPLETED`.
-- Sales and purchase list endpoints may return other statuses.
-
-## 10. Common HTTP behavior
-
-The API uses standard HTTP status codes for authentication, authorization and request validation.
-
-| Status | Meaning |
-|---|---|
-| 200 | Request completed |
-| 400 | Invalid business filter, such as start date later than end date |
-| 401 | Missing, invalid or expired authentication |
-| 403 | Authenticated user lacks the required permission |
-| 422 | Request validation error |
-
-The exact error response body is defined by the FastAPI exception handling and validation behavior in the running application.
-
-## 11. Existing ERP integration boundary
-
-The target ERP environment uses Java Spring Boot, MySQL and Angular. The Phase 4 backend exposes REST APIs that can be evaluated for integration.
-
-A production integration contract still needs to be finalized and verified in a later phase. In particular, service-to-service authentication, trusted identity propagation, deployment topology, token issuance and production error mapping must not be assumed to be implemented merely because the REST endpoints exist.
-
-The Spring Boot application must not be allowed to set an arbitrary tenant identity for business-data access. Tenant identity must be validated through a trusted authentication mechanism.
-
-12. Phase 5 frontend integration
-Phase 5 connects the Angular frontend to the backend endpoints documented above. It does not change the backend API contract.
-Frontend endpoint usage
-Frontend feature	Backend endpoints
-Login	POST /auth/login
-Authenticated user profile	GET /auth/me
-Dashboard summary	GET /dashboard/summary
-Dashboard sales trend	GET /dashboard/sales-trend
-Dashboard top products	GET /dashboard/top-products
-Dashboard top vendors	GET /dashboard/top-vendors
-Dashboard inventory	GET /dashboard/inventory
-Dashboard low stock	GET /dashboard/low-stock
-Sales page	GET /sales
-Purchases page	GET /purchases
-Inventory page	GET /inventory
-Vendors page	GET /vendors
-Customers page	GET /customers
-
-Detail endpoints are available through the frontend data service for individual sales orders, purchase orders, inventory items, vendors and customers.
-Authentication in the Angular client
-After login, the client stores the returned access token in sessionStorage. The HTTP interceptor attaches it as:
 Authorization: Bearer <access_token>
+Current User
+GET /api/v1/auth/me
+
+Returns information about the authenticated user, including the user's role and tenant context.
+
+Requires authentication.
+3. Dashboard APIs
+All dashboard endpoints require authentication and the corresponding dashboard or analytics permission.
+Dashboard Summary
+GET /api/v1/dashboard/summary
+
+Permission: dashboard:read
+
+Returns permission-aware summary metrics, including applicable sales, purchase and inventory metrics.
+Sales Trend
+GET /api/v1/dashboard/sales-trend
+
+Permission: sales:analytics
+
+Query parameters:
+Parameter    Type    Default    Constraints
+limit    Integer    120    1–120
+
+Returns monthly sales trend data for the authenticated tenant.
+Top Products
+GET /api/v1/dashboard/top-products
+
+Permission: sales:analytics
+
+Returns the top-selling products based on sales records.
+Top Vendors
+GET /api/v1/dashboard/top-vendors
+
+Permission: purchase:analytics
+
+Returns vendor purchase ranking for the authenticated tenant.
+Inventory Analytics
+GET /api/v1/dashboard/inventory
+
+Permission: inventory:read
+
+Returns inventory summary information.
+Low Stock Analytics
+GET /api/v1/dashboard/low-stock
+
+Permission: inventory:read
+
+Returns inventory items requiring reorder attention.
+4. Sales APIs
+Permission: sales:read
+Method    Endpoint    Purpose
+GET    /api/v1/sales    List sales orders
+GET    /api/v1/sales/{order_id}    Retrieve a sales order
+
+Sales analytics additionally require sales:analytics.
+
+Responses are scoped to the authenticated tenant.
+5. Purchase APIs
+Permission: purchase:read
+Method    Endpoint    Purpose
+GET    /api/v1/purchases    List purchase orders
+GET    /api/v1/purchases/{order_id}    Retrieve a purchase order
+
+Purchase analytics additionally require purchase:analytics.
+
+Responses are scoped to the authenticated tenant.
+6. Inventory APIs
+Permission: inventory:read
+Method    Endpoint    Purpose
+GET    /api/v1/inventory    List inventory items
+GET    /api/v1/inventory/{item_id}    Retrieve an inventory item
+
+Procurement-specific inventory information additionally requires inventory:procurement_read.
+7. Vendor APIs
+Permission: vendors:read
+Method    Endpoint    Purpose
+GET    /api/v1/vendors    List vendors
+GET    /api/v1/vendors/{vendor_id}    Retrieve a vendor
+
+Vendor information is restricted to roles with the required permission.
+8. Customer APIs
+Permission: customers:read
+Method    Endpoint    Purpose
+GET    /api/v1/customers    List customers
+GET    /api/v1/customers/{customer_id}    Retrieve a customer
+
+Customer information is restricted to roles with the required permission.
+9. AI Assistant API
+Natural Language ERP Query
+POST /api/v1/ai/query
+
+Permission: ai:query
+
+The endpoint accepts a natural-language question and uses the AI orchestrator to select an approved backend tool.
+
+Request:
+{
+  "question": "Show me the low stock items"
+}
 
 
-The login request itself is sent without an existing Bearer token.
+Request validation:
+Field    Type    Validation
+question    String    Minimum 2 characters
+question    String    Maximum 1000 characters
+Additional fields    Not allowed    Rejected
 
-The authenticated user's role is loaded from /auth/me. The frontend uses this role for navigation visibility and route guards. These client-side checks do not replace backend authorization.
-Local development proxy
-The Angular development server uses frontend/proxy.conf.json:
-- Browser API path: /api/...
-- Proxy target: http://127.0.0.1:8000
-- Backend API prefix: /api/v1
-The proxy is for local development. Production routing, TLS termination and reverse-proxy configuration must be defined for the deployment environment.
-Frontend data behavior
-- List pages use backend pagination parameters.
-- Inventory supports the backend low-stock filter.
-- Dashboard widgets call the analytics endpoints allowed for the authenticated role.
-- The client does not send a tenant ID to select business data.
-- The backend response schemas and permission checks remain authoritative for field visibility and data access.
-The frontend currently provides list and dashboard views. Create, update and delete workflows are not claimed as implemented by Phase 5.
+Response structure:
+{
+  "answer": "Low stock inventory information...",
+  "tool_used": "low_stock",
+  "source": "ollama",
+  "data": []
+}
+
+
+The example values illustrate the response structure; actual answer and data depend on the database and selected tool.
+
+Response fields:
+Field    Type    Description
+answer    String    Formatted answer
+tool_used    String or null    Approved tool selected
+source    String    ollama or fallback
+data    Any    Authorized backend result
+
+Supported AI Tools
+Tool    Description
+dashboard_summary    Dashboard summary
+sales_trend    Monthly sales trend
+top_products    Best-selling products
+top_vendors    Vendor purchase ranking
+inventory    Inventory information
+low_stock    Low-stock inventory
+
+Tool arguments are validated by Pydantic. The supported result limit is between 1 and 10.
+AI Execution and Authorization
+The AI model only selects an approved operation.
+
+The backend:
+1. Authenticates the request.
+2. Checks ai:query permission.
+3. Obtains tenant ID and role from the authenticated user.
+4. Validates the selected tool and arguments.
+5. Executes the approved backend service.
+6. Applies existing role permissions and tenant filters.
+7. Returns authorized data.
+The AI model cannot supply a trusted tenant ID or role, execute arbitrary SQL or bypass backend authorization.
+
+If Ollama is unavailable or returns an invalid response, the orchestrator can use the keyword-based fallback classifier.
+10. Permission Matrix
+Permission    Administrator    Sales    Purchase    Management
+dashboard:read    Yes    Yes    Yes    Yes
+sales:read    Yes    Yes    No    Yes
+sales:analytics    Yes    Yes    No    Yes
+purchase:read    Yes    No    Yes    Yes
+purchase:analytics    Yes    No    Yes    Yes
+inventory:read    Yes    Yes    Yes    Yes
+inventory:procurement_read    Yes    No    Yes    Yes
+vendors:read    Yes    No    Yes    Yes
+customers:read    Yes    Yes    No    Yes
+ai:query    Yes    Yes    Yes    Yes
+
+All business data access is restricted to the authenticated user's tenant.
+11. Common HTTP Status Codes
+Status    Meaning
+200    Request successful
+400    Invalid or unsupported operation
+401    Authentication required or invalid
+403    Permission denied
+404    Requested record not found
+422    Request validation failed
+500    Internal server error
+
+Actual error response details depend on the endpoint and exception handler.
+12. Pagination and Filtering
+List endpoints support the pagination and filtering parameters defined by their request handlers.
+
+Clients should use the documented endpoint schema in /docs as the authoritative reference for available query parameters and response structure.
+
+The dashboard sales-trend endpoint supports limit from 1 through 120.
+13. Spring Boot Integration Contract
+This project documents a REST integration boundary for an existing Spring Boot ERP environment.
+
+The FastAPI service can be called by another backend using HTTP and the documented request/response contracts.
+
+A production integration requires agreement on:
+- Service-to-service authentication.
+- Trusted user and tenant identity propagation.
+- Authorization responsibility.
+- Network and gateway configuration.
+- Error mapping and timeout behavior.
+- Integration testing against the actual Spring Boot application.
+This repository does not claim that a live Spring Boot integration has already been deployed.
+14. API Verification
+Start the backend and open:
+
+http://localhost:8000/docs
+
+Use the interactive API documentation to inspect:
+- Request schemas.
+- Response schemas.
+- Query parameters.
+- Authentication requirements.
+- Available endpoints.
+For automated backend verification:
+cd backend
+python -m pytest

@@ -1,4 +1,4 @@
-﻿from fastapi import HTTPException, status
+from fastapi import HTTPException, status
 
 from app.core.permissions import ROLE_PERMISSIONS
 from app.repositories.dashboard_repository import DashboardRepository
@@ -30,9 +30,14 @@ class DashboardService:
 
         return data
 
-    def get_sales_trend(self, tenant_id: int, role: str):
+    def get_sales_trend(
+        self,
+        tenant_id: int,
+        role: str,
+        limit: int = 120,
+    ):
         self._check_permission(role, "sales:analytics")
-        return self.repository.get_sales_trend(tenant_id)
+        return self.repository.get_sales_trend(tenant_id, limit)
 
     def get_top_products(self, tenant_id: int, role: str, limit: int = 5):
         self._check_permission(role, "sales:analytics")
