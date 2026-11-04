@@ -24,10 +24,18 @@ class OllamaClient:
             ],
             "options": {
                 "temperature": 0,
+                "top_p": 0.1,
+                "seed": 42,
+                "num_predict": 120,
             },
         }
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        timeout = httpx.Timeout(
+            timeout=30.0,
+            connect=5.0,
+        )
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/chat",
                 json=payload,
@@ -49,9 +57,16 @@ class OllamaClient:
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Ollama returned an empty response")
 
-        parsed = json.loads(content)
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "Ollama returned invalid JSON"
+            ) from exc
 
         if not isinstance(parsed, dict):
-            raise TypeError("Invalid Ollama tool selection format")
+            raise TypeError(
+                "Invalid Ollama tool selection format"
+            )
 
         return parsed

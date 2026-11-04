@@ -23,7 +23,10 @@ export class Dashboard implements OnInit {
 
   getSalesBarWidth(value: number): number {
     const items = this.data()?.salesTrend ?? [];
-    const maximum = Math.max(...items.map(item => Number(item.total_sales)), 0);
+    const maximum = Math.max(
+      ...items.map(item => Number(item.total_sales)),
+      0
+    );
 
     if (maximum <= 0) {
       return 0;
@@ -36,6 +39,20 @@ export class Dashboard implements OnInit {
     const items = this.data()?.topProducts ?? [];
     const maximum = Math.max(
       ...items.map(item => Number(item.total_quantity_sold)),
+      0
+    );
+
+    if (maximum <= 0) {
+      return 0;
+    }
+
+    return Math.max((Number(value) / maximum) * 100, 2);
+  }
+
+  getVendorBarWidth(value: number): number {
+    const items = this.data()?.topVendors ?? [];
+    const maximum = Math.max(
+      ...items.map(item => Number(item.total_purchase_value)),
       0
     );
 

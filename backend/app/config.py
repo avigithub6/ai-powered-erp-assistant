@@ -1,3 +1,4 @@
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,6 +9,9 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     DATABASE_URL: str = "mysql+pymysql://erp_user:erp_password@localhost:3306/erp_assistant"
+
+    # Separate database account for read-only AI analytics
+    AI_DATABASE_URL: str | None = None
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:1.5b"

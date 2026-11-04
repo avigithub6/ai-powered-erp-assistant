@@ -1,6 +1,6 @@
 import pytest
 from app.db.base import Base
-from app.db.session import get_db
+from app.db.session import get_ai_db, get_db
 from app.main import app
 from app.models import (
     Customer,
@@ -184,6 +184,8 @@ def client(db_session):
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+
+    app.dependency_overrides[get_ai_db] = override_get_db
 
     with TestClient(app) as test_client:
         yield test_client

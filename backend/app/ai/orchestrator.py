@@ -1,5 +1,5 @@
+
 import httpx
-from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 
@@ -11,88 +11,183 @@ from app.schemas.ai import AIQueryResponse
 
 
 def fallback_tool(question: str) -> ToolSelection | None:
-    text = question.lower()
+    text = " ".join(
+        question.lower().replace("-", " ").split()
+    )
 
+    # 1. Vendor search
     if (
-        any(word in text for word in ["compare", "comparison", "versus", " vs "])
-        and any(word in text for word in ["sales", "revenue"])
-        and any(word in text for word in ["purchase", "purchases", "procurement"])
+        "steel" in text
+        and any(
+            word in text
+            for word in [
+                "vendor",
+                "vendors",
+                "supplier",
+                "suppliers",
+                "delhi",
+                "ncr",
+                "gurugram",
+                "gurgaon",
+                "faridabad",
+                "noida",
+            ]
+        )
+    ):
+        tool = "vendor_search"
+
+    # 2. Low stock and replenishment
+    elif any(
+        phrase in text
+        for phrase in [
+            "low stock",
+            "stock alert",
+            "stock below",
+            "below reorder",
+            "reorder",
+            "replenish",
+            "replenishment",
+            "need attention",
+            "needs attention",
+            "require attention",
+            "requires attention",
+            "inventory alert",
+            "items to restock",
+            "products to restock",
+        ]
+    ):
+        tool = "low_stock"
+
+    # 3. Explicit sales and purchase comparison
+    elif (
+        any(
+            phrase in text
+            for phrase in [
+                "compare",
+                "comparison",
+                "versus",
+                " vs ",
+                "difference between",
+                "higher than",
+                "greater than",
+                "lower than",
+                "less than",
+            ]
+        )
+        and any(
+            word in text
+            for word in ["sales", "sale", "revenue"]
+        )
+        and any(
+            word in text
+            for word in [
+                "purchase",
+                "purchases",
+                "procurement",
+            ]
+        )
     ):
         tool = "sales_purchase_comparison"
 
-    elif (
-        "steel" in text
-        and any(word in text for word in [
-            "vendor",
-            "supplier",
-            "delhi",
-            "ncr",
-            "gurugram",
-            "gurgaon",
-            "faridabad",
-            "noida",
-        ])
-    ) or any(word in text for word in [
-        "steel supplier",
-        "steel vendor",
-        "vendors supplying steel",
-        "suppliers supplying steel",
-    ]):
-        tool = "vendor_search"
-
-    elif any(word in text for word in [
-        "low stock",
-        "low-stock",
-        "reorder",
-        "stock alert",
-        "stock below",
-    ]):
-        tool = "low_stock"
-
-    elif any(word in text for word in [
-        "sales trend",
-        "monthly sales",
-        "sales over time",
-        "sales performance",
-    ]):
+    # 4. Monthly sales trends
+    elif any(
+        phrase in text
+        for phrase in [
+            "sales trend",
+            "monthly sales",
+            "monthly revenue",
+            "revenue trend",
+            "sales over time",
+            "sales performance",
+            "sales performing monthly",
+            "sales performance over time",
+            "overall sales trend",
+            "monthly sales performance",
+        ]
+    ):
         tool = "sales_trend"
 
-    elif any(word in text for word in [
-        "top vendor",
-        "best vendor",
-        "vendor ranking",
-        "top supplier",
-        "best supplier",
-        "supplier ranking",
-    ]):
+    # 5. Vendor rankings
+    elif any(
+        phrase in text
+        for phrase in [
+            "top vendor",
+            "top vendors",
+            "best vendor",
+            "best vendors",
+            "vendor ranking",
+            "top supplier",
+            "top suppliers",
+            "best supplier",
+            "best suppliers",
+            "major supplier",
+            "major suppliers",
+            "highest purchase value",
+            "highest value vendors",
+            "highest value suppliers",
+            "highest purchasing vendors",
+        ]
+    ):
         tool = "top_vendors"
 
-    elif any(word in text for word in [
-        "top product",
-        "best selling",
-        "best-selling",
-        "most sold",
-        "highest selling",
-    ]):
+    # 6. Best-selling products
+    elif any(
+        phrase in text
+        for phrase in [
+            "top product",
+            "top products",
+            "best selling",
+            "best-selling",
+            "most sold",
+            "most popular products",
+            "highest selling",
+            "highest sales quantity",
+            "product sales ranking",
+            "selling products",
+        ]
+    ):
         tool = "top_products"
 
-    elif any(word in text for word in [
-        "inventory",
-        "stock",
-        "available items",
-        "item details",
-    ]):
+    # 7. General inventory
+    elif any(
+        phrase in text
+        for phrase in [
+            "inventory",
+            "stock level",
+            "stock levels",
+            "available stock",
+            "available items",
+            "inventory availability",
+            "item details",
+            "current stock",
+        ]
+    ):
         tool = "inventory"
 
-    elif any(word in text for word in [
-        "dashboard",
-        "summary",
-        "overview",
-        "business status",
-        "total sales",
-        "total purchase",
-        "purchase",
-    ]):
+    # 8. General business summary
+    elif any(
+        phrase in text
+        for phrase in [
+            "dashboard",
+            "summary",
+            "summarize",
+            "overview",
+            "business status",
+            "business performance",
+            "total sales",
+            "total sale",
+            "total revenue",
+            "total purchase",
+            "total procurement",
+            "purchase value",
+            "purchase summary",
+            "sales summary",
+            "customer activity",
+            "important business metrics",
+            "overall business",
+            "company performance",
+        ]
+    ):
         tool = "dashboard_summary"
 
     else:
@@ -102,6 +197,7 @@ def fallback_tool(question: str) -> ToolSelection | None:
         tool=tool,
         arguments={"limit": 5},
     )
+
 
 def format_answer(tool: str, data: dict | list) -> str:
     if tool == "dashboard_summary":
@@ -115,11 +211,13 @@ def format_answer(tool: str, data: dict | list) -> str:
                 f"Total purchases: {data['total_purchase_value']}"
             )
 
-        parts.extend([
-            f"Completed sales orders: {data['sales_order_count']}",
-            f"Inventory items: {data['inventory_item_count']}",
-            f"Low-stock items: {data['low_stock_count']}",
-        ])
+        parts.extend(
+            [
+                f"Completed sales orders: {data['sales_order_count']}",
+                f"Inventory items: {data['inventory_item_count']}",
+                f"Low-stock items: {data['low_stock_count']}",
+            ]
+        )
 
         return "Dashboard summary: " + "; ".join(parts) + "."
 
@@ -149,10 +247,18 @@ def format_answer(tool: str, data: dict | list) -> str:
             for item in data
         ]
 
-        return "Steel vendors found in Delhi NCR: " + "; ".join(lines) + "."
+        return (
+            "Steel vendors found in Delhi NCR: "
+            + "; ".join(lines)
+            + "."
+        )
+
     if tool == "sales_trend":
         if not data:
-            return "Insufficient data: no completed sales trend data is available."
+            return (
+                "Insufficient data: no completed sales trend data "
+                "is available."
+            )
 
         lines = [
             f"{item['month']}: {item['total_sales']}"
@@ -165,7 +271,8 @@ def format_answer(tool: str, data: dict | list) -> str:
             return (
                 answer
                 + " Insufficient data to identify an increase or decrease. "
-                + "Possible reasons cannot be confirmed from one month of sales data."
+                + "Possible reasons cannot be confirmed from one month "
+                + "of sales data."
             )
 
         first_sales = float(data[0]["total_sales"])
@@ -176,7 +283,8 @@ def format_answer(tool: str, data: dict | list) -> str:
                 answer
                 + " Percentage change cannot be calculated because "
                 + "the first month's sales were zero. "
-                + "Possible reasons cannot be confirmed from sales figures alone."
+                + "Possible reasons cannot be confirmed from sales "
+                + "figures alone."
             )
 
         percentage_change = (
@@ -194,10 +302,11 @@ def format_answer(tool: str, data: dict | list) -> str:
             answer
             + f" Sales {trend} by {abs(percentage_change):.2f}% "
             + f"from {data[0]['month']} to {data[-1]['month']}. "
-            + "Possible reasons cannot be confirmed from sales figures alone; "
-            + "pricing, demand, stock availability, and marketing data "
-            + "would be needed."
+            + "Possible reasons cannot be confirmed from sales "
+            + "figures alone; pricing, demand, stock availability, "
+            + "and marketing data would be needed."
         )
+
     if tool == "top_products":
         if not data:
             return "No completed sales product data is available."
@@ -225,9 +334,11 @@ def format_answer(tool: str, data: dict | list) -> str:
             for item in data
         ]
 
-        return "Top vendors by completed purchase value: " + "; ".join(
-            lines
-        ) + "."
+        return (
+            "Top vendors by completed purchase value: "
+            + "; ".join(lines)
+            + "."
+        )
 
     if tool in {"inventory", "low_stock"}:
         items = data["items"]
@@ -270,15 +381,17 @@ class AIOrchestrator:
 
     async def query(self, question: str, current_user: User, db):
         selection = None
-        source = "fallback"
+        source = "ollama"
 
+        # Primary path: Ollama selects the tool.
         try:
             model_response = await self.ollama_client.select_tool(
                 question
             )
 
-            selection = ToolSelection.model_validate(model_response)
-            source = "ollama"
+            selection = ToolSelection.model_validate(
+                model_response
+            )
 
         except (
             httpx.HTTPError,
@@ -286,9 +399,7 @@ class AIOrchestrator:
             ValidationError,
             TypeError,
         ):
-            selection = None
-
-        if selection is None:
+            # Recovery path: deterministic fallback.
             selection = fallback_tool(question)
             source = "fallback"
 
@@ -304,23 +415,20 @@ class AIOrchestrator:
 
         executor = ToolExecutor(db)
 
-        try:
-            result = executor.execute(
-                selection=selection,
-                tenant_id=current_user.tenant_id,
-                role=current_user.role,
-            )
-
-        except HTTPException as exc:
-            if exc.status_code == 403:
-                raise
-
-            raise
+        # Backend independently enforces permissions and tenant scope.
+        result = executor.execute(
+            selection=selection,
+            tenant_id=current_user.tenant_id,
+            role=current_user.role,
+        )
 
         safe_data = jsonable_encoder(result)
 
         return AIQueryResponse(
-            answer=format_answer(selection.tool, safe_data),
+            answer=format_answer(
+                selection.tool,
+                safe_data,
+            ),
             tool_used=selection.tool,
             source=source,
             data=safe_data,

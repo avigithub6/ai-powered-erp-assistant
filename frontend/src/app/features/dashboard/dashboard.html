@@ -1,12 +1,20 @@
+
 <div class="dashboard">
   <div class="page-heading">
     <div>
+      <span class="eyebrow">BUSINESS OVERVIEW</span>
       <h1>Dashboard</h1>
-      <p>Overview of your business performance</p>
+      <p>Monitor your business performance and operational health.</p>
     </div>
 
-    <button type="button" (click)="loadDashboard()" [disabled]="loading()">
-      {{ loading() ? 'Loading...' : 'Refresh' }}
+    <button
+      type="button"
+      class="refresh-button"
+      (click)="loadDashboard()"
+      [disabled]="loading()"
+    >
+      <span class="refresh-icon">↻</span>
+      {{ loading() ? 'Loading...' : 'Refresh Data' }}
     </button>
   </div>
 
@@ -15,179 +23,235 @@
   } @else if (errorMessage()) {
     <div class="error-message" role="alert">{{ errorMessage() }}</div>
   } @else if (data(); as dashboard) {
+
     <section class="summary-grid">
-      @if (dashboard.summary.total_sales !== null) {
-        <article class="summary-card">
-          <span>Total Sales</span>
-          <strong>{{ dashboard.summary.total_sales | currency:'INR':'symbol':'1.0-2' }}</strong>
-        </article>
-      }
+      <article class="summary-card sales-card">
+        <div class="card-top">
+          <span class="card-label">Total Sales</span>
+          <span class="metric-icon sales-icon">₹</span>
+        </div>
+        <strong>{{ dashboard.summary.total_sales | currency:'INR':'symbol':'1.0-2' }}</strong>
+        <span class="card-caption">Completed business sales</span>
+      </article>
 
-      @if (dashboard.summary.total_purchase_value !== null) {
-        <article class="summary-card">
-          <span>Total Purchase Value</span>
-          <strong>{{ dashboard.summary.total_purchase_value | currency:'INR':'symbol':'1.0-2' }}</strong>
-        </article>
-      }
+      <article class="summary-card purchase-card">
+        <div class="card-top">
+          <span class="card-label">Purchase Value</span>
+          <span class="metric-icon purchase-icon">↗</span>
+        </div>
+        <strong>
+          @if (dashboard.summary.total_purchase_value !== null) {
+            {{ dashboard.summary.total_purchase_value | currency:'INR':'symbol':'1.0-2' }}
+          } @else {
+            N/A
+          }
+        </strong>
+        <span class="card-caption">Total purchase amount</span>
+      </article>
 
-      @if (dashboard.summary.total_sales !== null) {
-        <article class="summary-card">
-          <span>Completed Sales Orders</span>
-          <strong>{{ dashboard.summary.sales_order_count }}</strong>
-        </article>
-      }
+      <article class="summary-card orders-card">
+        <div class="card-top">
+          <span class="card-label">Sales Orders</span>
+          <span class="metric-icon orders-icon">▤</span>
+        </div>
+        <strong>{{ dashboard.summary.sales_order_count }}</strong>
+        <span class="card-caption">Completed sales orders</span>
+      </article>
 
-      <article class="summary-card">
-        <span>Inventory Items</span>
+      <article class="summary-card inventory-card">
+        <div class="card-top">
+          <span class="card-label">Inventory Items</span>
+          <span class="metric-icon inventory-icon">▦</span>
+        </div>
         <strong>{{ dashboard.summary.inventory_item_count }}</strong>
+        <span class="card-caption">Available inventory records</span>
       </article>
 
       <article class="summary-card warning-card">
-        <span>Low Stock Items</span>
+        <div class="card-top">
+          <span class="card-label">Low Stock Items</span>
+          <span class="metric-icon warning-icon">!</span>
+        </div>
         <strong>{{ dashboard.summary.low_stock_count }}</strong>
+        <span class="card-caption">Items requiring attention</span>
       </article>
     </section>
 
-    @if (dashboard.salesTrend.length > 0) {
-      <section class="data-section">
-        <h2>Monthly Sales Trend</h2>
+    <div class="section-heading">
+      <div>
+        <h2>Business Analytics</h2>
+        <p>Performance insights from your business data</p>
+      </div>
+      <span class="live-indicator">● Live data</span>
+    </div>
 
-        <div class="chart-container">
-          @for (item of dashboard.salesTrend; track item.month) {
+    <div class="analytics-grid">
+      <section class="data-section chart-section">
+        <div class="section-title">
+          <div>
+            <h3>Monthly Sales Trend</h3>
+            <p>Sales value by month</p>
+          </div>
+          <span class="section-icon blue-icon">₹</span>
+        </div>
+
+        @if (dashboard.salesTrend.length > 0) {
+          <div class="chart-container">
+            @for (item of dashboard.salesTrend; track item.month) {
+              <div class="chart-row">
+                <span class="chart-label">{{ item.month }}</span>
+                <div class="chart-track">
+                  <div
+                    class="chart-bar sales-bar"
+                    [style.width.%]="getSalesBarWidth(item.total_sales)"
+                  ></div>
+                </div>
+                <strong class="chart-value">
+                  {{ item.total_sales | currency:'INR':'symbol':'1.0-0' }}
+                </strong>
+              </div>
+            }
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Total Sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of dashboard.salesTrend; track item.month) {
+                  <tr>
+                    <td>{{ item.month }}</td>
+                    <td class="numeric-cell">
+                      {{ item.total_sales | currency:'INR':'symbol':'1.0-2' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">No sales trend data available.</div>
+        }
+      </section>
+
+      <section class="data-section chart-section">
+        <div class="section-title">
+          <div>
+            <h3>Top Selling Products</h3>
+            <p>Products ranked by quantity sold</p>
+          </div>
+          <span class="section-icon teal-icon">▥</span>
+        </div>
+
+        @if (dashboard.topProducts.length > 0) {
+          <div class="chart-container">
+            @for (product of dashboard.topProducts; track product.inventory_id) {
+              <div class="chart-row">
+                <span class="chart-label">{{ product.item_name }}</span>
+                <div class="chart-track">
+                  <div
+                    class="chart-bar product-bar"
+                    [style.width.%]="getProductBarWidth(product.total_quantity_sold)"
+                  ></div>
+                </div>
+                <strong class="chart-value">
+                  {{ product.total_quantity_sold }} units
+                </strong>
+              </div>
+            }
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th class="numeric-cell">Quantity Sold</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (product of dashboard.topProducts; track product.inventory_id) {
+                  <tr>
+                    <td>{{ product.item_name }}</td>
+                    <td>{{ product.sku }}</td>
+                    <td class="numeric-cell">{{ product.total_quantity_sold }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">No product sales data available.</div>
+        }
+      </section>
+    </div>
+
+    <section class="data-section">
+      <div class="section-title">
+        <div>
+          <h3>Top Vendors</h3>
+          <p>Vendor ranking by purchase value</p>
+        </div>
+        <span class="section-icon purple-icon">♧</span>
+      </div>
+
+      @if (dashboard.topVendors.length > 0) {
+        <div class="chart-container vendor-chart">
+          @for (vendor of dashboard.topVendors; track vendor.vendor_id) {
             <div class="chart-row">
-              <span class="chart-label">{{ item.month }}</span>
+              <span class="chart-label">{{ vendor.vendor_name }}</span>
               <div class="chart-track">
                 <div
-                  class="chart-bar sales-bar"
-                  [style.width.%]="getSalesBarWidth(item.total_sales)"
+                  class="chart-bar vendor-bar"
+                  [style.width.%]="getVendorBarWidth(vendor.total_purchase_value)"
                 ></div>
               </div>
               <strong class="chart-value">
-                {{ item.total_sales | currency:'INR':'symbol':'1.0-0' }}
+                {{ vendor.total_purchase_value | currency:'INR':'symbol':'1.0-0' }}
               </strong>
             </div>
           }
         </div>
 
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Total Sales</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (item of dashboard.salesTrend; track item.month) {
-                <tr>
-                  <td>{{ item.month }}</td>
-                  <td>{{ item.total_sales | currency:'INR':'symbol':'1.0-2' }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </section>
-    }
-
-    @if (dashboard.topProducts.length > 0) {
-      <section class="data-section">
-        <h2>Top Selling Products</h2>
-
-        <div class="chart-container">
-          @for (product of dashboard.topProducts; track product.inventory_id) {
-            <div class="chart-row">
-              <span class="chart-label">{{ product.item_name }}</span>
-              <div class="chart-track">
-                <div
-                  class="chart-bar product-bar"
-                  [style.width.%]="getProductBarWidth(product.total_quantity_sold)"
-                ></div>
-              </div>
-              <strong class="chart-value">
-                {{ product.total_quantity_sold }} units
-              </strong>
-            </div>
-          }
-        </div>
-
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th>Quantity Sold</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (product of dashboard.topProducts; track product.inventory_id) {
-                <tr>
-                  <td>{{ product.item_name }}</td>
-                  <td>{{ product.sku }}</td>
-                  <td>{{ product.total_quantity_sold }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </section>
-    }
-
-    @if (dashboard.topVendors.length > 0) {
-      <section class="data-section">
-        <h2>Top Vendors</h2>
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
                 <th>Vendor</th>
-                <th>Purchase Value</th>
+                <th class="numeric-cell">Purchase Value</th>
               </tr>
             </thead>
             <tbody>
               @for (vendor of dashboard.topVendors; track vendor.vendor_id) {
                 <tr>
                   <td>{{ vendor.vendor_name }}</td>
-                  <td>{{ vendor.total_purchase_value | currency:'INR':'symbol':'1.0-2' }}</td>
+                  <td class="numeric-cell">
+                    {{ vendor.total_purchase_value | currency:'INR':'symbol':'1.0-2' }}
+                  </td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
-      </section>
-    }
-
-    <section class="data-section">
-      <h2>Inventory Overview</h2>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>SKU</th>
-              <th>Stock</th>
-              <th>Reorder Level</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (item of dashboard.inventory.items; track item.id) {
-              <tr>
-                <td>{{ item.item_name }}</td>
-                <td>{{ item.sku }}</td>
-                <td>{{ item.stock_level }} {{ item.unit }}</td>
-                <td>{{ item.reorder_level }} {{ item.unit }}</td>
-              </tr>
-            } @empty {
-              <tr><td colspan="4">No inventory records found.</td></tr>
-            }
-          </tbody>
-        </table>
-      </div>
+      } @else {
+        <div class="empty-state">No vendor purchase data available.</div>
+      }
     </section>
 
     <section class="data-section">
-      <h2>Low Stock Alerts</h2>
+      <div class="section-title">
+        <div>
+          <h3>Inventory Overview</h3>
+          <p>Current stock levels and reorder information</p>
+        </div>
+        <span class="section-icon blue-icon">▦</span>
+      </div>
+
       <div class="table-wrapper">
         <table>
           <thead>
@@ -196,18 +260,69 @@
               <th>SKU</th>
               <th>Current Stock</th>
               <th>Reorder Level</th>
+              <th>Stock Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of dashboard.inventory.items; track item.id) {
+              <tr>
+                <td class="primary-cell">{{ item.item_name }}</td>
+                <td>{{ item.sku }}</td>
+                <td>{{ item.stock_level }} {{ item.unit }}</td>
+                <td>{{ item.reorder_level }} {{ item.unit }}</td>
+                <td>
+                  @if (item.stock_level <= item.reorder_level) {
+                    <span class="status-badge status-low">Low Stock</span>
+                  } @else {
+                    <span class="status-badge status-available">Available</span>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="empty-cell">No inventory records found.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="data-section alert-section">
+      <div class="section-title">
+        <div>
+          <h3>Low Stock Alerts</h3>
+          <p>Inventory items at or below their reorder level</p>
+        </div>
+        <span class="section-icon red-icon">!</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>SKU</th>
+              <th>Current Stock</th>
+              <th>Reorder Level</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             @for (item of dashboard.lowStock.items; track item.id) {
               <tr>
-                <td>{{ item.item_name }}</td>
+                <td class="primary-cell">{{ item.item_name }}</td>
                 <td>{{ item.sku }}</td>
                 <td class="low-stock">{{ item.stock_level }} {{ item.unit }}</td>
                 <td>{{ item.reorder_level }} {{ item.unit }}</td>
+                <td>
+                  <span class="status-badge status-low">Reorder Required</span>
+                </td>
               </tr>
             } @empty {
-              <tr><td colspan="4">No low stock items found.</td></tr>
+              <tr>
+                <td colspan="5" class="empty-cell">No low stock items found.</td>
+              </tr>
             }
           </tbody>
         </table>

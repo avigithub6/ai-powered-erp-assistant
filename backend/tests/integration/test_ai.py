@@ -1,5 +1,8 @@
 import httpx
-from app.ai.orchestrator import OllamaClient
+from app.ai.orchestrator import AIOrchestrator, OllamaClient, format_answer
+from app.core.permissions import ROLE_PERMISSIONS
+from app.models import AIQueryAudit
+from fastapi import HTTPException
 
 
 def get_token(client, username, tenant_code="COMPANY_A"):
@@ -448,8 +451,6 @@ def test_ai_prompt_injection_cannot_access_another_tenant(
         for item in items
     )
 
-from app.ai.orchestrator import format_answer
-
 
 def test_sales_trend_explains_increase():
     data = [
@@ -497,3 +498,177 @@ def test_sales_trend_handles_zero_baseline():
 
     assert "first month's sales were zero" in answer
     assert "Percentage change cannot be calculated" in answer
+
+
+def test_ai_successful_query_creates_audit_record(
+    client,
+    db_session,
+    monkeypatch,
+):
+    async def mock_select_tool(self, question):
+        return {
+            "tool": "dashboard_summary",
+            "arguments": {"limit": 5},
+        }
+
+    monkeypatch.setattr(
+        OllamaClient,
+        "select_tool",
+        mock_select_tool,
+    )
+
+    response = client.post(
+        "/api/v1/ai/query",
+        headers=auth_headers(client, "admin_a"),
+        json={"question": "Show dashboard summary"},
+    )
+
+    assert response.status_code == 200
+
+    audit = (
+        db_session.query(AIQueryAudit)
+        .filter_by(question="Show dashboard summary")
+        .one()
+    )
+
+    assert audit.tenant_id == 1
+    assert audit.user_id == 1
+    assert audit.selected_tool == "dashboard_summary"
+    assert audit.source == "ollama"
+    assert audit.status == "success"
+    assert audit.execution_time_ms >= 0
+    assert audit.error_type is None
+
+
+def test_ai_failed_query_creates_failure_audit(
+    client,
+    db_session,
+    monkeypatch,
+):
+    async def mock_query(
+        self,
+        question,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=500,
+            detail="Simulated AI failure",
+        )
+
+    monkeypatch.setattr(
+        AIOrchestrator,
+        "query",
+        mock_query,
+    )
+
+    response = client.post(
+        "/api/v1/ai/query",
+        headers=auth_headers(client, "admin_a"),
+        json={"question": "Test failed AI query"},
+    )
+
+    assert response.status_code == 500
+
+    audit = (
+        db_session.query(AIQueryAudit)
+        .filter_by(question="Test failed AI query")
+        .one()
+    )
+
+    assert audit.status == "failed"
+    assert audit.error_type == "HTTPException"
+    assert audit.tenant_id == 1
+    assert audit.user_id == 1
+
+
+def test_ai_audit_records_are_tenant_scoped(
+    client,
+    db_session,
+    monkeypatch,
+):
+    async def mock_select_tool(self, question):
+        return {
+            "tool": "dashboard_summary",
+            "arguments": {"limit": 5},
+        }
+
+    monkeypatch.setattr(
+        OllamaClient,
+        "select_tool",
+        mock_select_tool,
+    )
+
+    response = client.post(
+        "/api/v1/ai/query",
+        headers=auth_headers(
+            client,
+            "admin_b",
+            "COMPANY_B",
+        ),
+        json={"question": "Company B dashboard summary"},
+    )
+
+    assert response.status_code == 200
+
+    audit = (
+        db_session.query(AIQueryAudit)
+        .filter_by(
+            question="Company B dashboard summary"
+        )
+        .one()
+    )
+
+    assert audit.tenant_id == 2
+    assert audit.user_id == 3
+
+    company_a_records = (
+        db_session.query(AIQueryAudit)
+        .filter_by(tenant_id=1)
+        .all()
+    )
+
+    assert all(
+        record.tenant_id == 1
+        for record in company_a_records
+    )
+
+
+def test_ai_permission_denied_attempt_creates_audit_record(
+    client,
+    db_session,
+    monkeypatch,
+):
+    sales_permissions = set(
+        ROLE_PERMISSIONS["Sales Executive"]
+    )
+
+    monkeypatch.setitem(
+        ROLE_PERMISSIONS,
+        "Sales Executive",
+        sales_permissions - {"ai:query"},
+    )
+
+    response = client.post(
+        "/api/v1/ai/query",
+        headers=auth_headers(client, "sales_a"),
+        json={"question": "Show confidential AI data"},
+    )
+
+    assert response.status_code == 403
+
+    audit = (
+        db_session.query(AIQueryAudit)
+        .filter_by(
+            question="Show confidential AI data"
+        )
+        .one()
+    )
+
+    assert audit.tenant_id == 1
+    assert audit.user_id == 2
+    assert audit.selected_tool is None
+    assert audit.source is None
+    assert audit.status == "denied"
+    assert audit.error_type == "PermissionDenied"
+    assert audit.execution_time_ms >= 0

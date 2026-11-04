@@ -8,8 +8,10 @@ from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.vendor import Vendor
 from app.models.vendor_item import VendorItem
+from app.models.ai_query_audit import AIQueryAudit
 
 __all__ = [
+    "AIQueryAudit",
     "Customer",
     "Inventory",
     "PurchaseOrder",
