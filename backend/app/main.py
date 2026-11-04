@@ -1,6 +1,12 @@
 from fastapi import FastAPI
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.customers import router as customers_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.inventory import router as inventory_router
+from app.api.v1.purchases import router as purchases_router
+from app.api.v1.sales import router as sales_router
+from app.api.v1.vendors import router as vendors_router
 from app.config import settings
 
 app = FastAPI(
@@ -10,11 +16,18 @@ app = FastAPI(
     description="Multi-Tenant AI-Powered ERP Assistant API",
 )
 
-
-app.include_router(
+routers = [
     auth_router,
-    prefix=settings.API_V1_PREFIX,
-)
+    dashboard_router,
+    sales_router,
+    purchases_router,
+    inventory_router,
+    vendors_router,
+    customers_router,
+]
+
+for router in routers:
+    app.include_router(router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health", tags=["Health"])
