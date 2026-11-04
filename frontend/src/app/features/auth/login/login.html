@@ -1,0 +1,63 @@
+<main class="login-page">
+  <section class="login-card">
+    <div class="brand">
+      <div class="brand-icon">ERP</div>
+      <h1>AI-Powered ERP Assistant</h1>
+      <p>Sign in to manage your business operations</p>
+    </div>
+
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="tenant_code">Tenant Code</label>
+        <input
+          id="tenant_code"
+          type="text"
+          formControlName="tenant_code"
+          placeholder="Enter tenant code"
+          autocomplete="organization"
+        />
+        @if (loginForm.controls.tenant_code.touched && loginForm.controls.tenant_code.invalid) {
+          <small>Tenant code is required.</small>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          type="text"
+          formControlName="username"
+          placeholder="Enter username"
+          autocomplete="username"
+        />
+        @if (loginForm.controls.username.touched && loginForm.controls.username.invalid) {
+          <small>Username is required.</small>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          formControlName="password"
+          placeholder="Enter password"
+          autocomplete="current-password"
+        />
+        @if (loginForm.controls.password.touched && loginForm.controls.password.invalid) {
+          <small>Password is required.</small>
+        }
+      </div>
+
+      @if (errorMessage()) {
+        <div class="error-message" role="alert">{{ errorMessage() }}</div>
+      }
+
+      <button type="submit" [disabled]="loading()">
+        {{ loading() ? 'Signing in...' : 'Sign In' }}
+      </button>
+    </form>
+
+    <p class="footer-text">Secure business access</p>
+  </section>
+</main>

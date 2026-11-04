@@ -196,3 +196,44 @@ Not represented as completed:
 - Final project acceptance and delivery.
 
 The architecture documentation will be expanded after subsequent phases are implemented and verified.
+
+10. Phase 5 — Angular frontend architecture
+Phase 5 implements the Angular client for the existing FastAPI APIs.
+Frontend structure
+The Angular application uses standalone components and is organized into:
+- core/auth: authentication-related functionality.
+- core/guards: authentication and role-based route guards.
+- core/interceptors: HTTP authentication interceptor.
+- core/models: authentication, dashboard and ERP response models.
+- core/services: authentication, dashboard and ERP API services.
+- features/auth: login page.
+- features/dashboard: dashboard page.
+- features/sales: sales orders page.
+- features/purchases: purchase orders page.
+- features/inventory: inventory page.
+- features/vendors: vendors page.
+- features/customers: customers page.
+- layout: authenticated application layout and navigation.
+Frontend request flow
+1. The user submits tenant code, username and password on the login page.
+2. Angular calls POST /api/v1/auth/login.
+3. The access token is stored in browser sessionStorage.
+4. Angular calls GET /api/v1/auth/me to load the authenticated user's profile.
+5. The HTTP interceptor attaches the Bearer token to protected API requests.
+6. The authentication guard protects the application routes.
+7. The role guard checks the role allowed by route metadata.
+8. The layout displays only the navigation items allowed for the loaded role.
+9. Feature services call the corresponding FastAPI endpoints.
+10. The backend performs the actual authentication, permission and tenant checks.
+Local development proxy
+frontend/proxy.conf.json forwards requests beginning with /api to http://127.0.0.1:8000. This avoids requiring browser-side cross-origin configuration for the local Angular development workflow.
+
+This development proxy is not a production reverse-proxy or deployment architecture.
+Authorization boundary
+Frontend route guards and hidden navigation items improve the user experience but are not security controls by themselves. A user can attempt to call an API directly. Therefore, the FastAPI backend must continue enforcing permissions and tenant-scoped access for every protected operation.
+
+The browser does not determine the tenant ID used for business-data access.
+Phase 5 scope boundary
+The implemented frontend provides read-oriented ERP pages and dashboard views using the existing backend APIs. It does not introduce new backend business endpoints, order creation workflows, an AI chat interface or production Spring Boot integration.
+
+The AI assistant remains planned for a later phase.

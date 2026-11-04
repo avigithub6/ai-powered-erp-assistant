@@ -1,0 +1,159 @@
+.page-container {
+  padding: 28px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+    color: #172033;
+  }
+
+  p {
+    margin: 0;
+    color: #718096;
+  }
+}
+
+.refresh-btn,
+.pagination button {
+  padding: 9px 16px;
+  border: 1px solid #dce2eb;
+  border-radius: 7px;
+  background: white;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filter-card {
+  background: white;
+  border: 1px solid #e5e9f0;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 18px;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #334155;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.filter-option input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.table-card {
+  background: white;
+  border: 1px solid #e5e9f0;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.table-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  span {
+    color: #718096;
+    font-size: 13px;
+  }
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+
+  th,
+  td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #edf0f4;
+    white-space: nowrap;
+  }
+
+  th {
+    color: #64748b;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  td {
+    color: #334155;
+    font-size: 14px;
+  }
+}
+
+.item-name {
+  font-weight: 600;
+}
+
+.stock-status {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.stock-status.low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.stock-status.normal {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.message {
+  padding: 35px;
+  text-align: center;
+  color: #64748b;
+}
+
+.error-message {
+  padding: 15px;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 7px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  color: #64748b;
+  font-size: 13px;
+
+  div {
+    display: flex;
+    gap: 8px;
+  }
+}

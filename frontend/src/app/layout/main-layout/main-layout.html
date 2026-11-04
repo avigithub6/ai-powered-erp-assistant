@@ -1,0 +1,53 @@
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">ERP</div>
+      <span>ERP Assistant</span>
+    </div>
+
+    <nav class="navigation">
+      <p class="nav-heading">WORKSPACE</p>
+
+      @for (item of visibleNavigation; track item.path) {
+        <a
+          class="nav-link"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+        >
+          {{ item.label }}
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      <button type="button" class="logout-button" (click)="logout()">
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div>
+        <h2>AI-Powered ERP Assistant</h2>
+        <p>Business Management System</p>
+      </div>
+
+      @if (authService.currentUser; as user) {
+        <div class="user-profile">
+          <div class="user-avatar">
+            {{ user.full_name.charAt(0).toUpperCase() }}
+          </div>
+          <div class="user-details">
+            <strong>{{ user.full_name }}</strong>
+            <span>{{ user.role }}</span>
+          </div>
+        </div>
+      }
+    </header>
+
+    <section class="page-content">
+      <router-outlet />
+    </section>
+  </main>
+</div>

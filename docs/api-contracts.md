@@ -271,3 +271,44 @@ The target ERP environment uses Java Spring Boot, MySQL and Angular. The Phase 4
 A production integration contract still needs to be finalized and verified in a later phase. In particular, service-to-service authentication, trusted identity propagation, deployment topology, token issuance and production error mapping must not be assumed to be implemented merely because the REST endpoints exist.
 
 The Spring Boot application must not be allowed to set an arbitrary tenant identity for business-data access. Tenant identity must be validated through a trusted authentication mechanism.
+
+12. Phase 5 frontend integration
+Phase 5 connects the Angular frontend to the backend endpoints documented above. It does not change the backend API contract.
+Frontend endpoint usage
+Frontend feature	Backend endpoints
+Login	POST /auth/login
+Authenticated user profile	GET /auth/me
+Dashboard summary	GET /dashboard/summary
+Dashboard sales trend	GET /dashboard/sales-trend
+Dashboard top products	GET /dashboard/top-products
+Dashboard top vendors	GET /dashboard/top-vendors
+Dashboard inventory	GET /dashboard/inventory
+Dashboard low stock	GET /dashboard/low-stock
+Sales page	GET /sales
+Purchases page	GET /purchases
+Inventory page	GET /inventory
+Vendors page	GET /vendors
+Customers page	GET /customers
+
+Detail endpoints are available through the frontend data service for individual sales orders, purchase orders, inventory items, vendors and customers.
+Authentication in the Angular client
+After login, the client stores the returned access token in sessionStorage. The HTTP interceptor attaches it as:
+Authorization: Bearer <access_token>
+
+
+The login request itself is sent without an existing Bearer token.
+
+The authenticated user's role is loaded from /auth/me. The frontend uses this role for navigation visibility and route guards. These client-side checks do not replace backend authorization.
+Local development proxy
+The Angular development server uses frontend/proxy.conf.json:
+- Browser API path: /api/...
+- Proxy target: http://127.0.0.1:8000
+- Backend API prefix: /api/v1
+The proxy is for local development. Production routing, TLS termination and reverse-proxy configuration must be defined for the deployment environment.
+Frontend data behavior
+- List pages use backend pagination parameters.
+- Inventory supports the backend low-stock filter.
+- Dashboard widgets call the analytics endpoints allowed for the authenticated role.
+- The client does not send a tenant ID to select business data.
+- The backend response schemas and permission checks remain authoritative for field visibility and data access.
+The frontend currently provides list and dashboard views. Create, update and delete workflows are not claimed as implemented by Phase 5.

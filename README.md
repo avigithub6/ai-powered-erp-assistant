@@ -244,3 +244,50 @@ git diff --check
 - [Security](docs/security.md)
 
 These documents describe the implementation through Phase 4. They will be expanded and verified as the remaining phases are completed.
+
+## Phase 5 — Angular frontend
+
+Phase 5 adds the Angular frontend and connects it to the implemented FastAPI APIs.
+
+### Implemented frontend features
+
+- Login form using tenant code, username and password.
+- JWT authentication through the backend login endpoint.
+- Authenticated user lookup through `GET /api/v1/auth/me`.
+- Bearer token attachment through an HTTP interceptor.
+- Authentication guard for protected application routes.
+- Role-based route guards and navigation visibility.
+- Dashboard with backend summary and analytics data.
+- Sales orders list.
+- Purchase orders list.
+- Inventory list with low-stock filtering.
+- Vendor list.
+- Customer list.
+- Loading, error, empty-state, refresh and pagination handling on data pages.
+
+### Frontend role navigation
+
+| Role | Available frontend sections |
+|---|---|
+| Administrator | Dashboard, Sales, Purchases, Inventory, Vendors, Customers |
+| Sales Executive | Dashboard, Sales, Inventory, Customers |
+| Purchase Executive | Dashboard, Purchases, Inventory, Vendors |
+| Management | Dashboard, Sales, Purchases, Inventory, Vendors, Customers |
+
+Frontend role guards and navigation only control the user interface. The FastAPI backend remains responsible for authentication, tenant isolation and permission enforcement.
+
+### Frontend API configuration
+
+During local development, Angular uses the proxy configuration in `frontend/proxy.conf.json` to forward `/api` requests to `http://127.0.0.1:8000`.
+
+The frontend does not send or select a tenant ID for business-data requests. The backend derives tenant identity from the authenticated user.
+
+The JWT access token is stored in browser `sessionStorage`. This is a development implementation and should be reviewed against the deployment security requirements before production use.
+
+### Run the frontend
+
+Open a terminal in the `frontend` directory:
+
+```powershell
+npm install
+npm start

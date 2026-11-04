@@ -1,0 +1,83 @@
+<section class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Vendors</h1>
+      <p>View and manage your company's vendor information.</p>
+    </div>
+
+    <button
+      class="refresh-btn"
+      (click)="loadVendors()"
+      [disabled]="loading()"
+    >
+      Refresh
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="message">Loading vendors...</div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-message">{{ errorMessage() }}</div>
+  }
+
+  @if (!loading() && !errorMessage() && data()) {
+    <div class="table-card">
+      <div class="table-heading">
+        <h2>All Vendors</h2>
+        <span>{{ data()!.total }} total vendors</span>
+      </div>
+
+      @if (data()!.items.length > 0) {
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Vendor Name</th>
+                <th>Contact Person</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Address</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (vendor of data()!.items; track vendor.id) {
+                <tr>
+                  <td class="vendor-name">{{ vendor.vendor_name }}</td>
+                  <td>{{ vendor.contact_person || 'N/A' }}</td>
+                  <td>{{ vendor.email || 'N/A' }}</td>
+                  <td>{{ vendor.phone || 'N/A' }}</td>
+                  <td class="address-cell">{{ vendor.address || 'N/A' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="message">No vendors found.</div>
+      }
+
+      <div class="pagination">
+        <span>Page {{ page() + 1 }} of {{ totalPages || 1 }}</span>
+
+        <div>
+          <button
+            (click)="previousPage()"
+            [disabled]="page() === 0"
+          >
+            Previous
+          </button>
+
+          <button
+            (click)="nextPage()"
+            [disabled]="(page() + 1) * pageSize >= data()!.total"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

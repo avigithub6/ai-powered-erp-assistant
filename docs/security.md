@@ -147,3 +147,29 @@ Not claimed as completed in Phase 4:
 - Final production security review.
 
 These items must be designed, implemented and verified in their appropriate later phases.
+
+11. Phase 5 frontend security considerations
+The Angular frontend adds authentication handling and role-aware navigation. These features do not replace the backend security controls described above.
+Token handling
+- The login response access token is stored in browser sessionStorage.
+- The HTTP interceptor attaches the token as a Bearer authorization header to protected API requests.
+- The login endpoint is excluded from Bearer-token attachment.
+- Logout clears the stored token and the in-memory authenticated user.
+- The authenticated user profile is loaded from the backend /auth/me endpoint.
+sessionStorage is the current implementation choice for this development phase. Browser storage is accessible to JavaScript running on the page; production deployment must assess XSS risk, token lifetime, refresh/re-authentication behavior and the organization's token-storage policy.
+Frontend route and navigation checks
+The authentication guard prevents unauthenticated users from entering protected application routes.
+
+The role guard and layout navigation use the role returned by the backend to control which pages are displayed to each role.
+
+These checks are user-interface controls only. They must never be treated as authorization enforcement. Direct API requests must still be rejected by the backend when the user lacks the required permission.
+Tenant handling
+The Angular client does not accept a tenant ID from a page, route, query parameter or business-data form to select a tenant's records. The login form supplies a tenant code for authentication; after authentication, business-data tenant scope is determined by the backend from the validated user context.
+Sensitive fields
+The frontend conditionally displays procurement purchase-price information according to the authenticated role. The backend response schema and permission checks remain the security boundary. Hiding a field in Angular alone is not sufficient to protect it.
+
+Sales users must not receive procurement-only fields from the backend. The same principle applies to purchase, vendor and sales information restricted by backend permissions.
+Phase 5 security verification boundary
+Role-based page visibility, restricted route redirects and a Company B tenant check were manually verified during development. Backend integration and security tests were completed in the earlier backend phase.
+
+These checks do not constitute a production penetration test, a complete XSS assessment or verification of production identity propagation from the existing Spring Boot ERP.
