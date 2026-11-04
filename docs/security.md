@@ -167,6 +167,8 @@ The AI assistant can select only the following tools:
 4. top_vendors
 5. inventory
 6. low_stock
+7. sales_purchase_comparison
+8. vendor_search
 Tool Validation
 Tool selection is validated using Pydantic schemas.
 
@@ -234,26 +236,42 @@ The current logging implementation does not claim comprehensive audit coverage o
 
 Production deployments should use centralized log collection, retention policies, access controls and monitoring.
 8. Database and Network Security
+
 The application uses MySQL 8 with InnoDB.
 
-Current development configuration:
-- The database application user is configured for the application database rather than global database administration.
-- The MySQL container exposes port 3306.
-- The backend exposes port 8000.
+Application Database Access
+- The main FastAPI application uses its configured application database account.
 - Database connection and query timeouts are configured.
 - Database connections use connection health checks and pool settings.
-The current application does not implement a separately configured read-only database account dedicated to AI queries.
+
+Dedicated AI Read-Only Database Account
+- A separate MySQL account, erp_ai_readonly, is configured.
+- It has SELECT permission on erp_assistant.* only.
+- A separate SQLAlchemy engine and AIReadOnlySessionLocal are configured.
+- The get_ai_db dependency provides the read-only database session.
+- Write operations are denied by MySQL permissions.
+
+Spring Boot Read-Only Database Account
+- Spring Boot uses a separate account, erp_spring_readonly.
+- It has SELECT permission only on erp_assistant.sales_orders.
+- It does not have INSERT, UPDATE, DELETE or schema modification permissions.
+- Spring Boot retrieves sales orders through tenant-scoped parameterized SQL.
+
+Network Configuration
+- MySQL container exposes port 3306 for local development.
+- FastAPI backend exposes port 8000.
+- Spring Boot listens on port 8080 inside Docker and is published on localhost port 8081.
+- Backend services communicate over the Docker network.
+
 Production Recommendations
 Before production deployment:
 - Restrict MySQL network exposure.
 - Bind database ports to localhost or use a private network where appropriate.
 - Restrict backend access through a reverse proxy or firewall.
 - Use HTTPS.
-- Use strong database credentials.
-- Apply least-privilege database grants.
-- Consider a dedicated read-only account for read-only workloads.
-- Configure database backups and recovery procedures.
+- Store database credentials securely and rotate them when required.
 - Review database timeout and connection-pool settings under production load.
+- Configure database backups and recovery procedures.
 9. Environment and Secret Management
 Configuration is supplied through environment variables.
 
@@ -306,12 +324,22 @@ python -m ruff check app tests
 
 Security tests should be extended whenever a new endpoint, role, permission or AI tool is introduced.
 12. Known Security Boundaries
-The following items require additional work before a production deployment:
-1. Comprehensive service-layer audit logging.
-2. Dedicated read-only database credentials for read-only workloads.
-3. Production network restrictions for database and backend ports.
-4. Production secret management and credential rotation.
-5. Review of browser token storage and XSS protections.
-6. Deployment-specific HTTPS, monitoring, backup and recovery configuration.
-7. Integration-specific authentication and tenant propagation if connected to an existing Spring Boot ERP.
-These are documented limitations and production hardening requirements, not claims of completed functionality.
+
+The following items still require additional work before production deployment:
+1. Comprehensive service-layer audit logging across all business operations.
+2. Production network restrictions for database and backend ports.
+3. Production secret management and credential rotation.
+4. Review of browser token storage and XSS protections.
+5. Deployment-specific HTTPS, monitoring, backup and recovery configuration.
+6. Production load testing and deployment-specific security review.
+
+Completed security controls:
+- Dedicated AI read-only MySQL account with SELECT-only permissions.
+- Dedicated Spring Boot read-only account with SELECT-only access to sales_orders.
+- Spring Boot internal service-token authentication.
+- Trusted tenant ID propagation from the authenticated FastAPI user.
+- Tenant-scoped Spring Boot sales order queries.
+- AI query audit logging for success, failure and permission-denied attempts.
+- Automated integration tests for tenant isolation and role restrictions.
+
+These completed controls are implemented and tested in the current development environment. Production deployment still requires environment-specific hardening and verification.

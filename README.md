@@ -1,434 +1,471 @@
 ﻿# AI-Powered ERP Assistant
 
-A multi-tenant ERP analytics and AI assistant built with Angular 21, FastAPI, MySQL 8 and Ollama.
+An AI-powered, multi-tenant ERP analytics assistant built with **FastAPI, Angular, MySQL, Spring Boot, and Ollama**. It provides secure role-based access to ERP analytics and allows users to ask business questions in natural language.
 
-The application provides role-based ERP dashboards, sales and purchase analytics, inventory visibility, tenant isolation and natural-language queries through a controlled AI tool-execution layer.
+---
 
 ## Project Status
 
-| Phase | Scope | Status |
-|---|---|---|
-| Phase 1 | Project foundation and database schema | Completed |
-| Phase 2 | Authentication and tenant isolation | Completed |
-| Phase 3 | Role-based permissions and business APIs | Completed |
-| Phase 4 | Dashboard analytics and backend integration tests | Completed |
-| Phase 5 | Angular frontend | Completed |
-| Phase 6 | AI assistant and controlled tool integration | Completed |
-| Phase 7 | Documentation and submission readiness | In progress |
+**Core implementation completed and verified.**
+
+The project includes:
+- Multi-tenant authentication and authorization.
+- Role-based access control (RBAC).
+- Company-wise data isolation.
+- ERP analytics dashboards.
+- Natural-language AI assistant.
+- Controlled AI tool execution.
+- Read-only database access for AI analytics.
+- Spring Boot ERP integration.
+- AI query audit logging.
+- Automated backend and integration tests.
+
+---
 
 ## Technology Stack
 
-### Frontend
-- Angular 21
-- TypeScript
-- SCSS
-- RxJS
-- Angular Router and HTTP Interceptors
+| Layer | Technologies |
+|---|---|
+| Frontend | Angular 21, TypeScript |
+| Backend API | Python, FastAPI |
+| ERP Integration | Spring Boot 3.5.7, Java 21 |
+| Database | MySQL 8.0 |
+| ORM | SQLAlchemy 2 |
+| Database Migrations | Alembic |
+| Validation | Pydantic |
+| AI Orchestration | Python, Custom Tool-Based Orchestrator |
+| Local LLM | Ollama, Qwen 2.5 1.5B |
+| AI Alternative Model | Llama 3.1 8B |
+| Containerization | Docker, Docker Compose |
+| Testing | Pytest |
+| Code Quality | Ruff |
 
-### Backend
-- Python 3.12+
-- FastAPI
-- SQLAlchemy 2
-- Pydantic
-- Alembic
-- HTTPX
-
-### Database
-- MySQL 8
-- InnoDB
-- Tenant-aware relational schema
-- Separate read-only database account for AI analytics
-
-### AI
-- Ollama
-- `qwen2.5:1.5b`
-- Pydantic-validated tool selection
-- Controlled backend tool execution
-- Keyword-based fallback when the LLM is unavailable or returns an invalid response
-
-### Security and Quality
-- JWT Bearer authentication
-- Argon2 password hashing
-- Centralized role-permission definitions
-- Tenant-scoped database queries
-- Separate AI read-only database connection
-- AI query audit logging
-- Pytest
-- Ruff
-- Docker Compose
+---
 
 ## Architecture Overview
 
 ```text
-Angular 21 Frontend
-        |
-        | HTTP / REST + JWT
-        v
-FastAPI Backend
-        |
-        +----------------------+
-        |                      |
-        v                      v
- Authentication          ERP API Routers
- and Authorization             |
-        |                 Service Layer
-        |                      |
-        |                 Repository Layer
-        |                      |
-        |                      v
-        |                   MySQL 8
-        |
-        v
- AI Query Endpoint
-        |
-        +-------------------------------+
-        |                               |
-        v                               v
- AI Orchestrator                 Audit Logging
-        |                               |
-        v                               v
- Ollama / Fallback              Application DB
-        |
-        v
- Validated Tool Selection
-        |
-        v
- Authorized Tool Executor
-        |
-        v
- Backend Services and Repositories
-        |
-        v
- AI Read-Only MySQL Connection
-        |
-        v
- Tenant-Scoped ERP Data
+                 Users
+                   |
+                   v
+          Angular 21 Frontend
+                   |
+                   v
+             FastAPI Backend
+                   |
+        +----------+-----------+
+        |          |           |
+        v          v           v
+   Authentication  Analytics  AI Assistant
+   & RBAC          Services   Orchestrator
+        |          |           |
+        |          |           v
+        |          |      Ollama LLM
+        |          |           |
+        |          |      Tool Selection
+        |          |           |
+        |          |      Validated Tools
+        |          |           |
+        +----------+-----------+
+                   |
+                   v
+              MySQL 8.0
+                   ^
+                   |
+          Spring Boot ERP
+                   |
+          Read-Only JDBC Access
+                   |
+             Sales Orders
 ```
 
-The AI model selects an approved tool. The backend validates the selection, enforces permissions and retrieves data through existing services and repositories.
+### Main Components
 
-The AI model does not execute arbitrary SQL or directly access the database. AI analytics use a separate MySQL account with SELECT-only permissions. Audit records are written through the regular application database connection.
+1. **Angular Frontend:** Provides login, dashboard, analytics, reports, and AI chat interfaces.
+2. **FastAPI Backend:** Handles authentication, authorization, tenant isolation, analytics, and AI requests.
+3. **Spring Boot ERP Service:** Exposes an authenticated internal API to retrieve ERP sales orders.
+4. **MySQL:** Stores users, tenants, sales, purchases, inventory, vendors, and audit records.
+5. **Ollama:** Runs the local language model for natural-language question understanding.
 
-## Main Features
+---
 
-### Authentication
-- Login using tenant code, username and password.
-- JWT access token generation.
-- Authenticated user profile endpoint.
-- Active user and tenant validation.
-- Argon2 password hashing.
+## Key Features
 
-### Multi-Tenant Data Isolation
-- Business data is scoped to the authenticated user's tenant.
-- Tenant identity is derived from the validated backend user.
-- Client-supplied tenant IDs cannot override the authenticated tenant context.
-- Individual record lookups use tenant-scoped queries.
+### 1. Authentication and Role-Based Access Control
 
-### Role-Based Access Control
+- JWT-based authentication.
+- Password hashing.
+- Server-side role-based authorization.
+- Protected API endpoints.
+- Separate permissions for different business roles.
 
-Four application roles are implemented:
+### 2. Multi-Tenant Data Isolation
 
-| Role | Access |
-|---|---|
-| Administrator | All defined ERP permissions |
-| Sales Executive | Sales, customers, dashboard and general inventory |
-| Purchase Executive | Purchases, vendors, dashboard and procurement inventory |
-| Management | Defined ERP permissions and analytics |
+The application supports multiple companies.
 
-The backend enforces permissions. Frontend route guards and navigation visibility are user-interface controls only.
+- Company A users can access only Company A data.
+- Company B users can access only Company B data.
+- Tenant ID is derived from the authenticated user.
+- Client-provided tenant IDs are not trusted for authorization.
+- Database queries are scoped to the authenticated tenant.
 
-### ERP APIs
-- Authentication and user profile.
-- Dashboard summary and analytics.
-- Sales orders.
-- Purchase orders.
-- Inventory.
-- Vendors.
-- Customers.
+### 3. ERP Analytics Dashboard
 
-### Dashboard Analytics
+The dashboard provides business insights such as:
+
 - Total sales.
 - Total purchase value.
-- Completed sales order count.
-- Inventory item count.
-- Low-stock item count.
-- Monthly sales trend.
+- Sales order count.
 - Top-selling products.
 - Top vendors.
-- Paginated inventory and low-stock records.
+- Sales trends.
+- Inventory availability.
+- Low-stock items.
 
-Financial dashboard calculations use completed orders only. Sales and purchase list endpoints can return orders with other statuses.
+All metrics are retrieved from persistent database records.
 
-## AI Assistant
+### 4. Natural-Language AI Assistant
 
-The AI assistant accepts natural-language ERP questions through:
+Users can ask business questions in natural language.
 
-`POST /api/v1/ai/query`
+Supported examples:
 
-Example request:
+- What are the total sales?
+- Show the top 5 products.
+- Compare sales and purchases over the last 3 months.
+- Which products are running low on stock?
+- Who are the top vendors?
+- Find steel vendors in Delhi NCR.
+- Explain the sales trend.
 
-```json
-{
-  "question": "Show me the low stock items"
-}
-```
+### 5. Controlled AI Tool Execution
 
-The request accepts a question between 2 and 1000 characters and rejects additional fields.
+The LLM is used for understanding questions and selecting approved tools.
 
-The response schema contains:
-- `answer`
-- `tool_used`
-- `source`
-- `data`
+It does not execute arbitrary SQL queries.
 
-### Approved AI Tools
+The backend validates the selected tool and its arguments before execution.
+
+Approved tools:
 
 | Tool | Purpose |
 |---|---|
-| dashboard_summary | Overall dashboard metrics |
-| sales_trend | Monthly sales trend |
-| top_products | Best-selling products |
-| top_vendors | Vendor purchase ranking |
-| inventory | Inventory and available stock |
-| low_stock | Items requiring reorder attention |
-| sales_purchase_comparison | Sales and purchase comparison |
-| vendor_search | Vendor search by material and location |
+| `dashboard_summary` | Business summary |
+| `sales_trend` | Sales trend analysis |
+| `top_products` | Top-selling products |
+| `top_vendors` | Top vendors |
+| `inventory` | Inventory availability |
+| `low_stock` | Low-stock products |
+| `sales_purchase_comparison` | Sales and purchase comparison |
+| `vendor_search` | Search vendors by material and location |
 
-### AI Execution Safeguards
-- Ollama returns structured JSON for tool selection.
-- Pydantic validates the selected tool and arguments.
-- Only approved tools can be selected.
-- Tool limits are restricted to 1–10.
-- The backend supplies tenant identity and role from the authenticated user.
-- Existing backend services enforce the relevant permissions.
-- Inventory output uses an explicit field allowlist and excludes procurement-only fields.
-- The system prompt treats the user question as untrusted input.
-- Ollama requests use a 20-second timeout.
-- Keyword-based fallback selection is available if Ollama is unavailable or its response is invalid.
-- The model does not generate business figures or execute SQL.
-- AI analytics use a separate read-only database connection.
+### 6. AI Database Security
 
-The `source` response field identifies whether tool selection came from Ollama or fallback.
+- Separate MySQL read-only account for AI analytics.
+- AI account has SELECT-only permissions.
+- No INSERT, UPDATE, DELETE, or schema modification permissions.
+- Query execution timeout.
+- Restricted tool execution.
+- Tenant-scoped database access.
 
-## AI Audit Logging
+### 7. Spring Boot ERP Integration
 
-AI queries are recorded in the `ai_query_audits` table.
+A working Spring Boot service is integrated with FastAPI.
 
-The audit records include:
+**Spring Boot service:**
+- Spring Boot 3.5.7.
+- Java 21.
+- Spring JDBC.
+- Internal service-token authentication.
+- Tenant-scoped sales order queries.
+- Dedicated read-only MySQL account.
+
+**Integration flow:**
+
+```text
+Angular Frontend
+       |
+       v
+FastAPI Endpoint
+       |
+       | Internal Service Token
+       | Trusted Tenant ID
+       v
+Spring Boot ERP API
+       |
+       v
+Spring JDBC
+       |
+       v
+MySQL Sales Orders
+```
+
+Public FastAPI endpoint:
+
+`GET /api/v1/erp-integration/sales/orders`
+
+Internal Spring Boot endpoint:
+
+`GET /internal/erp/sales/orders`
+
+The authenticated user's tenant ID is passed by the backend. Spring Boot validates the internal service token and applies tenant filtering to database queries.
+
+### 8. AI Query Audit Logging
+
+AI query audit records include:
+
 - Tenant ID.
 - User ID.
 - User question.
 - Selected AI tool.
-- AI selection source.
-- Query execution status.
-- Execution time in milliseconds.
-- Error type, when available.
+- Execution source.
+- Request status.
+- Execution time.
+- Error type.
 - Creation timestamp.
 
-Audit logging supports tracking successful and failed AI query execution.
+Successful, failed, and permission-denied AI requests are recorded.
 
-Audit records are associated with the authenticated tenant and user. The regular application database connection is used to write audit records because the AI analytics database account is read-only.
+---
 
-## Repository Structure
+## User Roles and Permissions
+
+| Role | Access |
+|---|---|
+| Administrator | Permitted modules within their own company |
+| Sales Executive | Sales and customer-related information |
+| Purchase Executive | Purchase, vendor, and procurement information |
+| Management | Permitted business summary and analytics |
+
+Access is enforced on the backend. Hiding a frontend page does not replace backend authorization.
+
+### Demo Accounts
+
+All demo accounts use the password:
+
+`Demo@12345`
+
+| Company | Username | Role |
+|---|---|---|
+| Company A | `admin_a` | Administrator |
+| Company A | `sales_a` | Sales Executive |
+| Company A | `purchase_a` | Purchase Executive |
+| Company A | `manager_a` | Management |
+| Company B | `admin_b` | Administrator |
+| Company B | `sales_b` | Sales Executive |
+
+Login requires the appropriate tenant code:
+
+- Company A: `COMPANY_A`
+- Company B: `COMPANY_B`
+
+Use these credentials only in the local demo environment.
+
+---
+
+## Project Structure
 
 ```text
-AI-powered ERP Assistant/
-|
-+-- backend/
-|   +-- app/
-|   |   +-- ai/
-|   |   |   +-- llm/
-|   |   |   +-- prompts/
-|   |   |   +-- tools/
-|   |   |   +-- orchestrator.py
-|   |   +-- api/
-|   |   +-- core/
-|   |   +-- db/
-|   |   +-- models/
-|   |   +-- repositories/
-|   |   +-- schemas/
-|   |   +-- services/
-|   +-- alembic/
-|   +-- tests/
-|   +-- Dockerfile
-|
-+-- frontend/
-|   +-- src/
-|   +-- package.json
-|   +-- proxy.conf.json
-|
-+-- docs/
-|   +-- architecture.md
-|   +-- api-contracts.md
-|   +-- security.md
-|
-+-- docker-compose.yml
-+-- .env.example
-+-- .gitignore
-+-- README.md
+AI-powered-ERP-Assistant/
+│
+├── backend/
+│   ├── alembic/
+│   ├── app/
+│   │   ├── ai/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── db/
+│   │   ├── integrations/
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── schemas/
+│   │   ├── security/
+│   │   └── services/
+│   ├── tests/
+│   │   ├── integration/
+│   │   └── unit/
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   ├── angular.json
+│   └── package.json
+│
+├── spring-boot-erp/
+│   ├── src/
+│   │   └── main/
+│   │       ├── java/
+│   │       └── resources/
+│   ├── Dockerfile
+│   └── pom.xml
+│
+├── docs/
+│   ├── architecture.md
+│   ├── api-contracts.md
+│   └── security.md
+│
+├── script/
+│   └── test_ai_live.py
+│
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+└── README.md
 ```
+
+---
 
 ## Prerequisites
 
-Install the following:
-- Python 3.12 or later.
-- Node.js and npm compatible with the Angular 21 project.
-- Docker Desktop with Docker Compose.
-- Ollama installed on the host machine.
+Install the following tools:
+
+- Python 3.12 or compatible project-supported version.
+- Node.js and npm.
+- Docker Desktop.
 - Git.
+- Ollama.
 
-## Environment Configuration
-
-Create the local environment file from the example:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Update `.env` with appropriate local values.
-
-### Important Environment Variables
-
-| Variable | Purpose |
-|---|---|
-| APP_NAME | Application name |
-| APP_VERSION | Application version |
-| API_V1_PREFIX | Backend API prefix |
-| DEBUG | Debug mode; disable in production |
-| MYSQL_DATABASE | MySQL database name |
-| MYSQL_USER | Main application database user |
-| MYSQL_PASSWORD | Main application database password |
-| MYSQL_ROOT_PASSWORD | MySQL root password |
-| DATABASE_URL | Application database connection URL |
-| AI_DATABASE_URL | Separate read-only AI database connection URL |
-| OLLAMA_BASE_URL | Ollama endpoint |
-| OLLAMA_MODEL | Ollama model name |
-| JWT_SECRET_KEY | JWT signing secret |
-| JWT_ALGORITHM | JWT signing algorithm |
-| JWT_ACCESS_TOKEN_EXPIRE_MINUTES | JWT lifetime in minutes |
-
-The Docker Compose backend database URL uses `MYSQL_PASSWORD_URLENCODED`. Define this variable in `.env` with the URL-encoded form of the database password, especially when it contains reserved URL characters.
-
-Use strong, unique secrets. Never commit `.env` or production credentials.
-
-## AI Read-Only Database Setup
-
-The AI analytics layer uses a separate MySQL account with read-only permissions.
-
-The regular application database account is used for authentication, ERP operations and AI audit logging. The AI database account is used only for analytics data retrieval.
-
-### 1. Start MySQL
-
-From the repository root:
-
-```powershell
-docker compose up -d mysql
-```
-
-Wait until MySQL is healthy:
-
-```powershell
-docker compose ps
-```
-
-### 2. Connect to MySQL as root
-
-```powershell
-docker compose exec mysql mysql -uroot -p
-```
-
-Enter the MySQL root password configured in `.env`.
-
-### 3. Create the read-only account
-
-Run these SQL commands inside the MySQL prompt:
-
-```sql
-CREATE USER 'erp_ai_readonly'@'%'
-IDENTIFIED BY 'REPLACE_WITH_A_STRONG_PASSWORD';
-
-GRANT SELECT ON erp_assistant.*
-TO 'erp_ai_readonly'@'%';
-
-SHOW GRANTS FOR 'erp_ai_readonly'@'%';
-```
-
-Replace `erp_assistant` if `MYSQL_DATABASE` has a different value.
-
-The AI account must have only SELECT permission. Do not grant INSERT, UPDATE, DELETE, CREATE, ALTER, DROP or administrative privileges.
-
-The expected grants should include:
-
-```text
-GRANT USAGE ON *.* TO 'erp_ai_readonly'@'%'
-GRANT SELECT ON `erp_assistant`.* TO 'erp_ai_readonly'@'%'
-```
-
-Exit the MySQL prompt:
-
-```sql
-EXIT;
-```
-
-### 4. Configure AI_DATABASE_URL
-
-Add the following setting to `.env`:
-
-```env
-AI_DATABASE_URL=mysql+pymysql://erp_ai_readonly:YOUR_PASSWORD@mysql:3306/erp_assistant
-```
-
-Replace `YOUR_PASSWORD` with the password created for the AI account.
-
-URL-encode reserved characters in the password before placing it in the connection URL.
-
-For local development outside Docker, use `localhost` instead of `mysql` as the database hostname.
-
-### 5. Start or rebuild the backend
-
-```powershell
-docker compose up -d --build backend
-```
-
-### 6. Verify read-only permissions
-
-Check that the AI database account can read data:
-
-```powershell
-docker compose exec backend python -c "from sqlalchemy import text; from app.db.session import ai_engine; conn=ai_engine.connect(); print('Database user:', conn.execute(text('SELECT CURRENT_USER()')).scalar()); print('Tenant records:', conn.execute(text('SELECT COUNT(*) FROM tenants')).scalar()); conn.close()"
-```
-
-A CREATE TABLE attempt should fail with MySQL error 1142 because the AI account does not have CREATE permission.
-
-The AI account should never be used for audit logging or normal ERP write operations.
-
-## Run the Application
-
-### 1. Start Ollama on the host
-
-Ollama is not a Docker Compose service in this project. It runs separately on the host machine.
-
-Pull the configured model:
+For local AI inference, install Ollama and download the configured model.
 
 ```powershell
 ollama pull qwen2.5:1.5b
 ```
 
-Verify the model:
+---
+
+## Environment Configuration
+
+Clone the repository:
 
 ```powershell
-ollama list
+git clone https://github.com/avigithub6/ai-powered-erp-assistant.git
+cd ai-powered-erp-assistant
 ```
 
-Make sure the Ollama service is running and accessible at:
+Create your local environment file:
 
-`http://localhost:11434`
+```powershell
+Copy-Item .env.example .env
+```
 
-The Dockerized backend connects to the host Ollama service through:
+Update `.env` with strong local credentials.
 
-`http://host.docker.internal:11434`
+Important environment variables:
 
-### 2. Start MySQL and the backend
+| Variable | Description |
+|---|---|
+| `MYSQL_DATABASE` | MySQL database name |
+| `MYSQL_USER` | Application database user |
+| `MYSQL_PASSWORD` | Application database password |
+| `MYSQL_ROOT_PASSWORD` | MySQL root password |
+| `DATABASE_URL` | Main application database connection |
+| `AI_DATABASE_URL` | AI read-only database connection |
+| `OLLAMA_BASE_URL` | Ollama service URL |
+| `OLLAMA_MODEL` | Configured local LLM |
+| `SPRING_BOOT_ERP_BASE_URL` | Internal Spring Boot service URL |
+| `SPRING_BOOT_INTERNAL_TOKEN` | Shared internal service authentication token |
+| `SPRING_DB_USER` | Spring Boot read-only database user |
+| `SPRING_DB_PASSWORD` | Spring Boot database password |
+
+**Security:** Never commit `.env` or expose actual database passwords, JWT secrets, or internal service tokens.
+
+---
+
+## Database Setup
+
+The application uses MySQL 8.0 with persistent Docker volume storage.
+
+Start the database and application services:
+
+```powershell
+docker compose up --build -d
+```
+
+Check running services:
+
+```powershell
+docker compose ps
+```
+
+Run database migrations if they are not automatically applied by the configured startup workflow:
+
+```powershell
+docker compose exec backend alembic upgrade head
+```
+
+Seed demo data when setting up a fresh database:
+
+```powershell
+docker compose exec backend python -m app.db.seed
+```
+
+Run these initialization commands only as required by the current database state. Do not reseed an existing database unnecessarily.
+
+---
+
+## Spring Boot Read-Only Database Setup
+
+Spring Boot uses a separate MySQL account with read-only access to sales orders.
+
+Connect to MySQL as root:
+
+```powershell
+docker compose exec mysql mysql -uroot -p
+```
+
+Create the account and grant the required permission:
+
+```sql
+CREATE USER IF NOT EXISTS 'erp_spring_readonly'@'%'
+IDENTIFIED BY 'REPLACE_WITH_A_STRONG_PASSWORD';
+
+GRANT SELECT ON erp_assistant.sales_orders
+TO 'erp_spring_readonly'@'%';
+
+SHOW GRANTS FOR 'erp_spring_readonly'@'%';
+```
+
+Use the actual database name configured in `MYSQL_DATABASE`.
+
+Configure the following variables in `.env`:
+
+```env
+SPRING_BOOT_ERP_BASE_URL=http://spring-boot-erp:8080
+SPRING_BOOT_INTERNAL_TOKEN=REPLACE_WITH_A_LONG_RANDOM_SECRET
+SPRING_DB_USER=erp_spring_readonly
+SPRING_DB_PASSWORD=REPLACE_WITH_THE_DATABASE_PASSWORD
+```
+
+Use the same internal token for FastAPI and Spring Boot.
+
+Start the Spring Boot service:
+
+```powershell
+docker compose up --build -d spring-boot-erp
+```
+
+Verify its health:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8081/actuator/health"
+```
+
+Expected status:
+
+```json
+{
+  "status": "UP"
+}
+```
+
+The Spring Boot database account must not receive write or schema modification permissions.
+
+---
+
+## Running the Application
+
+### 1. Start Docker Services
 
 From the repository root:
 
@@ -436,33 +473,25 @@ From the repository root:
 docker compose up --build -d
 ```
 
-Check service status:
+### 2. Start Ollama
+
+Ensure Ollama is running on the host machine.
 
 ```powershell
-docker compose ps
+ollama serve
 ```
 
-View backend logs:
+If Ollama is already running as a background service, you do not need to start another instance.
+
+Download the configured model if it is not already installed:
 
 ```powershell
-docker compose logs -f backend
+ollama pull qwen2.5:1.5b
 ```
 
-### 3. Apply database migrations
+### 3. Start Angular Frontend
 
-```powershell
-docker compose exec backend alembic upgrade head
-```
-
-Check the current migration:
-
-```powershell
-docker compose exec backend alembic current
-```
-
-### 4. Start the Angular frontend
-
-Open another terminal:
+Open another PowerShell terminal:
 
 ```powershell
 cd frontend
@@ -470,177 +499,175 @@ npm install
 npm start
 ```
 
-The development server normally runs at:
+Open the frontend using the local URL shown by Angular, normally:
 
-`http://localhost:4200/`
+`http://localhost:4200`
 
-### 5. Access the backend
+### 4. Access Backend API Documentation
 
-API base URL:
-
-`http://localhost:8000/api/v1`
-
-Interactive API documentation:
+FastAPI Swagger UI:
 
 `http://localhost:8000/docs`
 
-Health endpoint:
+FastAPI ReDoc:
 
-`http://localhost:8000/health`
+`http://localhost:8000/redoc`
 
-The Angular development proxy forwards `/api` requests to the local FastAPI backend.
+Spring Boot health:
 
-## Demo Data and Credentials
+`http://localhost:8081/actuator/health`
 
-The project uses synthetic demonstration data for testing multi-tenant access.
-
-The seeded demonstration accounts are:
-
-| Tenant | Username | Role |
-|---|---|---|
-| COMPANY_A | admin_a | Administrator |
-| COMPANY_A | sales_a | Sales Executive |
-| COMPANY_A | purchase_a | Purchase Executive |
-| COMPANY_A | manager_a | Management |
-| COMPANY_B | admin_b | Administrator |
-| COMPANY_B | sales_b | Sales Executive |
-
-Demonstration password:
-
-`Demo@12345`
-
-These are development-only credentials. Do not use them in production. Confirm that the seed operation has been run before attempting login.
+---
 
 ## API Overview
 
-All versioned endpoints use `/api/v1`.
-
-| Area | Method and endpoints | Permission |
+| Module | Endpoint | Access |
 |---|---|---|
-| Authentication | POST /auth/login, GET /auth/me | Login / authenticated user |
-| Dashboard | GET /dashboard/summary | dashboard:read |
-| Sales analytics | GET /dashboard/sales-trend, GET /dashboard/top-products | sales:analytics |
-| Purchase analytics | GET /dashboard/top-vendors | purchase:analytics |
-| Inventory analytics | GET /dashboard/inventory, GET /dashboard/low-stock | inventory:read |
-| Sales | GET /sales, GET /sales/{order_id} | sales:read |
-| Purchases | GET /purchases, GET /purchases/{order_id} | purchase:read |
-| Inventory | GET /inventory, GET /inventory/{item_id} | inventory:read |
-| Vendors | GET /vendors, GET /vendors/{vendor_id} | vendors:read |
-| Customers | GET /customers, GET /customers/{customer_id} | customers:read |
-| AI Assistant | POST /ai/query | ai:query |
+| Authentication | `/api/v1/auth/login` | Public login |
+| Dashboard | `/api/v1/dashboard/summary` | Role-based |
+| Sales | `/api/v1/sales` | Sales permissions |
+| Purchases | `/api/v1/purchases` | Purchase permissions |
+| Vendors | `/api/v1/vendors` | Vendor permissions |
+| Inventory | `/api/v1/inventory` | Inventory permissions |
+| AI Assistant | `/api/v1/ai/query` | `ai:query` |
+| ERP Integration | `/api/v1/erp-integration/sales/orders` | `sales:read` |
 
-See API Contracts for request parameters, response fields and authorization details.
+All protected FastAPI endpoints require a valid JWT access token.
 
-## Frontend
+### Spring Boot Internal API
 
-The Angular frontend provides:
-- Login using tenant code, username and password.
-- JWT authentication and authenticated user lookup.
-- Bearer token HTTP interceptor.
-- Authentication and role-based route guards.
-- Role-aware application navigation.
-- Dashboard summary and analytics.
-- Sales orders list.
-- Purchase orders list.
-- Inventory list and low-stock filtering.
-- Vendor list.
-- Customer list.
-- Loading, error, empty-state, refresh and pagination handling on data pages.
+`GET /internal/erp/sales/orders`
 
-The frontend stores the access token in browser sessionStorage. This is a development implementation and requires production security review.
+Required headers:
 
-The current frontend provides read-oriented ERP pages. An AI chat interface and create/update/delete ERP workflows are not claimed as implemented.
+```text
+X-Internal-Service-Token: <internal-token>
+X-Tenant-Id: <trusted-tenant-id>
+```
 
-## Testing and Code Quality
+This endpoint is intended for internal service-to-service communication, not direct public frontend access.
 
-### Backend tests
+---
 
-From the repository root:
+## Security Considerations
+
+Security is a core part of this project.
+
+Implemented controls include:
+
+- JWT authentication.
+- Password hashing.
+- Backend-enforced RBAC.
+- Tenant isolation.
+- Tenant ID derived from authenticated identity.
+- Validated request and response schemas.
+- Restricted AI tool allowlist.
+- No arbitrary AI-generated SQL execution.
+- Separate read-only AI database account.
+- Separate read-only Spring Boot database account.
+- Internal service-token authentication.
+- Tenant-scoped Spring Boot queries.
+- Database query execution timeout.
+- AI query audit logging.
+- Automated security and integration tests.
+
+### Production Hardening
+
+Before production deployment, additional work should include:
+
+- HTTPS and secure reverse-proxy configuration.
+- Production secret management.
+- Token rotation and expiration policies.
+- Database backups and recovery testing.
+- Centralized monitoring and alerting.
+- Rate limiting and abuse protection.
+- Comprehensive audit coverage for all business operations.
+- Production deployment and infrastructure security review.
+
+---
+
+## Testing and Verification
+
+Run the complete backend test suite:
 
 ```powershell
 python -m pytest backend\tests -q
 ```
 
-### Ruff
+Run Spring Boot integration tests:
 
 ```powershell
-python -m ruff check backend\app backend\tests
+python -m pytest backend\tests\integration\test_erp_integration.py -v
 ```
 
-### Frontend tests
-
-From the frontend directory:
+Run AI integration tests:
 
 ```powershell
-npm test
+python -m pytest backend\tests\integration\test_ai.py -v
 ```
 
-### Frontend production build
+Run code quality checks:
 
 ```powershell
+python -m ruff check backend
+```
+
+Check frontend production build:
+
+```powershell
+cd frontend
 npm run build
-```
-
-### Git whitespace validation
-
-From the repository root:
-
-```powershell
-git diff --check
 ```
 
 ### Recorded Development Verification
 
-The latest recorded backend verification:
+The following results were verified during development:
 
-- 95 backend tests passed.
-- 3 AI audit integration tests passed as part of the backend test suite.
-- Successful AI query audit creation verified.
-- Failed AI query audit creation verified.
-- Tenant-specific AI audit records verified.
-- AI read-only database SELECT access verified.
-- AI read-only database CREATE restriction verified.
-- Ruff checks passed for the audit test file.
+| Verification | Result |
+|---|---|
+| Backend automated tests | 100 passed |
+| AI audit integration tests | 4 passed |
+| Spring Boot integration tests | 4 passed |
+| Company A/B live tenant integration | Verified |
+| AI read-only SELECT access | Verified |
+| AI read-only CREATE denial | Verified |
+| Spring Boot read-only permissions | Verified |
+| Ruff checks for updated integration code | Passed |
+| Angular production build | Passed |
+| Spring Boot health endpoint | UP |
 
-Earlier development verification also recorded:
-- 2 frontend tests passing.
-- Angular production build passing.
+These are recorded development results; rerun the commands to verify the current checkout.
 
-These results represent recorded development runs. Rerun the commands above in the final environment before submission.
-
-## Security Considerations
-
-- Backend authorization is authoritative; frontend role checks are not security boundaries.
-- Tenant identity is derived from the authenticated backend user.
-- Database queries are tenant-scoped.
-- AI tool execution uses an allowlist and existing backend permission checks.
-- The AI model cannot execute arbitrary SQL.
-- AI analytics use a separate database account with SELECT-only privileges.
-- AI audit records are written through the application database connection.
-- User input is treated as untrusted.
-- Authentication and authorization events are logged without logging passwords or JWT tokens.
-- `.env` must remain outside version control.
-- Production deployment must use strong secrets, HTTPS, restricted database exposure and appropriate network controls.
-- Review browser token storage and XSS protections before production deployment.
-
-See Security for further details and known boundaries.
-
-## Spring Boot Integration Boundary
-
-The target ERP environment includes an existing Java Spring Boot application.
-
-This repository provides an independently runnable FastAPI backend and Angular frontend, together with documented REST API contracts.
-
-A completed production integration with the existing Spring Boot ERP is not claimed. Service-to-service authentication, trusted identity propagation, deployment topology and production error mapping require integration-specific implementation and verification.
-
-See API Contracts for the integration boundary.
+---
 
 ## Documentation
 
-- Architecture
-- API Contracts
-- Security
+Additional technical documentation:
 
-## License
+- `docs/architecture.md` — System architecture and component responsibilities.
+- `docs/api-contracts.md` — API endpoints, request/response contracts, and integration details.
+- `docs/security.md` — Authentication, authorization, tenant isolation, and database security.
 
-This repository was prepared as an ERP assistant assignment project. Add the applicable license if required by the project owner.
+---
+
+## Future Improvements
+
+Potential future enhancements:
+
+- Additional Spring Boot ERP modules and endpoints.
+- More advanced AI response evaluation.
+- Expanded analytics and reporting.
+- Improved dashboard visualizations.
+- More comprehensive business-operation audit logging.
+- Production deployment automation.
+- Performance monitoring and caching.
+
+---
+
+## Author
+
+**Avinash Gupta**
+
+GitHub: [avigithub6](https://github.com/avigithub6)
+
+Repository: [AI-Powered ERP Assistant](https://github.com/avigithub6/ai-powered-erp-assistant)

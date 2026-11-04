@@ -8,6 +8,7 @@ The AI-Powered ERP Assistant is a multi-tenant application consisting of:
 - FastAPI backend.
 - MySQL 8 relational database.
 - Ollama-hosted language model.
+- Spring Boot ERP integration service.
 - Controlled AI tool-execution layer.
 
 The backend is responsible for authentication, authorization, tenant isolation, business logic and database access.
@@ -256,8 +257,10 @@ top_products    Best-selling products
 top_vendors    Vendor purchase ranking
 inventory    Inventory information
 low_stock    Low-stock items
+sales_purchase_comparison    Sales and purchase comparison for the last 90 days
+vendor_search    Tenant-scoped vendor search by material and location
 
-Tool arguments are validated using Pydantic. The configured limit is restricted to 1–10.
+Tool arguments are validated using Pydantic. The configured limit is restricted to 1-10.
 AI Security Boundary
 The language model is not an authorization authority.
 - The authenticated user determines tenant identity.
@@ -324,23 +327,89 @@ Host Machine
 
 
 This is a local development arrangement, not a production deployment topology.
-12. Spring Boot Integration Boundary
-The target ERP environment may contain an existing Spring Boot application.
+12. Spring Boot ERP Integration
 
-This repository currently provides a FastAPI service and documented REST API contracts. It does not claim a completed live integration with an existing Spring Boot deployment.
+The project now includes a working Spring Boot ERP integration service.
 
-A production integration would need:
-- Agreed service-to-service authentication.
-- Trusted identity and tenant propagation.
-- API gateway or network configuration.
-- Error and timeout handling.
-- Integration tests against the actual Spring Boot system.
-Refer to api-contracts.md for the documented API boundary.
+Spring Boot Integration Components
+- Spring Boot 3.5.7 application using Java 21.
+- Internal sales orders REST API.
+- Spring Boot JDBC integration with MySQL.
+- Shared internal service token authentication.
+- Tenant identity propagation through X-Tenant-Id.
+- Dedicated read-only MySQL database account.
+
+Integration Request Flow
+
+Angular Frontend
+       |
+       v
+FastAPI Backend
+       |
+       | Authenticated user and permission check
+       | Internal service token + trusted tenant ID
+       v
+Spring Boot ERP Service
+       |
+       | Validate internal token
+       | Validate tenant ID
+       v
+Sales Order Service
+       |
+       | Parameterized tenant-scoped SQL
+       v
+MySQL Database
+       |
+       v
+Validated Response to FastAPI
+
+Internal Spring Boot Endpoint
+
+GET /internal/erp/sales/orders
+
+Supported query parameters:
+- limit: 1 to 100, default 20.
+- offset: 0 or greater, default 0.
+
+Required headers:
+- X-Internal-Service-Token
+- X-Tenant-Id
+
+The FastAPI integration endpoint is:
+
+GET /api/v1/erp-integration/sales/orders
+
+FastAPI derives tenant identity from the authenticated user. It does not accept a client-supplied tenant ID as the authorization source.
+
+Security Controls
+- Spring Boot validates the internal service token.
+- Internal API requests without a valid token are rejected.
+- Tenant ID must be a positive integer.
+- Sales order queries always filter by tenant_id.
+- SQL queries use parameterized values.
+- Spring Boot connects using a dedicated MySQL account with SELECT permission only on sales_orders.
+- FastAPI enforces sales:read permission before calling Spring Boot.
+- Timeouts and upstream HTTP errors are handled by the integration client.
+- Integration tests verify Company A and Company B isolation and role restrictions.
+
+Docker Deployment
+
+Docker Compose includes:
+- MySQL 8.
+- FastAPI backend.
+- Spring Boot ERP service.
+
+The Spring Boot service listens on port 8080 inside Docker and is published on localhost port 8081 for local development.
+
+Refer to api-contracts.md for API details and security.md for authorization and database permission rules.
+
 13. Technology Summary
 Component    Technology
 Frontend    Angular 21
 Language    TypeScript
 Backend    Python 3.12+, FastAPI
+ERP Integration    Spring Boot 3.5.7, Java 21
+ERP Database Access    Spring JDBC
 ORM    SQLAlchemy 2
 Validation    Pydantic
 Database    MySQL 8, InnoDB

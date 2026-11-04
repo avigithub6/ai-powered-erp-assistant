@@ -57,7 +57,7 @@ Permission: sales:analytics
 
 Query parameters:
 Parameter    Type    Default    Constraints
-limit    Integer    120    1–120
+limit    Integer    120    1â€“120
 
 Returns monthly sales trend data for the authenticated tenant.
 Top Products
@@ -169,6 +169,8 @@ top_products    Best-selling products
 top_vendors    Vendor purchase ranking
 inventory    Inventory information
 low_stock    Low-stock inventory
+sales_purchase_comparison    Sales and purchase comparison for the last 90 days
+vendor_search    Tenant-scoped vendor search by material and location
 
 Tool arguments are validated by Pydantic. The supported result limit is between 1 and 10.
 AI Execution and Authorization
@@ -216,19 +218,72 @@ List endpoints support the pagination and filtering parameters defined by their 
 Clients should use the documented endpoint schema in /docs as the authoritative reference for available query parameters and response structure.
 
 The dashboard sales-trend endpoint supports limit from 1 through 120.
-13. Spring Boot Integration Contract
-This project documents a REST integration boundary for an existing Spring Boot ERP environment.
+13. Spring Boot ERP Integration Contract
 
-The FastAPI service can be called by another backend using HTTP and the documented request/response contracts.
+The project includes a working integration between FastAPI and a Spring Boot ERP service.
 
-A production integration requires agreement on:
-- Service-to-service authentication.
-- Trusted user and tenant identity propagation.
-- Authorization responsibility.
-- Network and gateway configuration.
-- Error mapping and timeout behavior.
-- Integration testing against the actual Spring Boot application.
-This repository does not claim that a live Spring Boot integration has already been deployed.
+FastAPI Public Endpoint
+
+GET /api/v1/erp-integration/sales/orders
+
+Permission: sales:read
+
+Authentication: JWT Bearer token
+
+Query parameters:
+Parameter    Type    Default    Constraints
+limit    Integer    20    1-100
+offset    Integer    0    0 or greater
+
+FastAPI obtains the tenant ID from the authenticated user. The client cannot select another tenant by passing a tenant ID.
+
+Response structure:
+{
+  "items": [
+    {
+      "id": 1,
+      "order_number": "SO-A-001",
+      "status": "confirmed",
+      "total_amount": "15000.00",
+      "order_date": "2026-11-05T10:00:00"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0
+}
+
+The response contains sales orders returned by the Spring Boot service for the authenticated tenant.
+
+Internal Spring Boot Endpoint
+
+GET /internal/erp/sales/orders
+
+Query parameters:
+- limit: 1-100, default 20.
+- offset: 0 or greater, default 0.
+
+Required internal headers:
+- X-Internal-Service-Token
+- X-Tenant-Id
+
+The internal endpoint is intended for service-to-service communication, not direct public client access.
+
+Integration Security
+1. FastAPI authenticates the user and checks sales:read permission.
+2. FastAPI obtains tenant ID from the authenticated user.
+3. FastAPI sends the internal service token and trusted tenant ID to Spring Boot.
+4. Spring Boot validates the internal token and tenant ID.
+5. Spring Boot queries sales_orders using a parameterized tenant-scoped SQL query.
+6. Spring Boot uses a dedicated MySQL account with SELECT-only access to sales_orders.
+7. FastAPI validates the upstream response before returning it.
+
+Error handling:
+- Invalid internal token: 401 from Spring Boot.
+- Invalid tenant header: 400 from Spring Boot.
+- Upstream timeout or service failure: handled by FastAPI integration endpoint.
+
+The Spring Boot service listens on port 8080 inside Docker and is published on localhost port 8081 for local development.
 14. API Verification
 Start the backend and open:
 

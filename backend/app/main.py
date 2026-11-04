@@ -8,6 +8,7 @@ from app.api.v1.inventory import router as inventory_router
 from app.api.v1.purchases import router as purchases_router
 from app.api.v1.sales import router as sales_router
 from app.api.v1.vendors import router as vendors_router
+from app.api.v1.erp_integration import router as erp_integration_router
 from app.config import settings
 
 app = FastAPI(
@@ -26,6 +27,7 @@ routers = [
     vendors_router,
     customers_router,
     ai_router,
+    erp_integration_router
 ]
 
 for router in routers:

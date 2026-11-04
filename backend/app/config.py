@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     # Separate database account for read-only AI analytics
     AI_DATABASE_URL: str | None = None
 
+    # Spring Boot ERP integration
+    SPRING_BOOT_ERP_BASE_URL: str = "http://spring-boot-erp:8080"
+    SPRING_BOOT_INTERNAL_TOKEN: str | None = None
+
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:1.5b"
 
