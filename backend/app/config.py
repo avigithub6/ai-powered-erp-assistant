@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "mysql+pymysql://erp_user:erp_password@localhost:3306/erp_assistant"
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen2.5:7b-instruct"
+    OLLAMA_MODEL: str = "qwen2.5:1.5b"
 
     # JWT Authentication
     JWT_SECRET_KEY: str

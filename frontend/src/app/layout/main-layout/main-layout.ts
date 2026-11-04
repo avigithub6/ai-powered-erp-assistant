@@ -1,5 +1,10 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 
 import { AuthService } from '../../core/services/auth.service';
 
@@ -49,6 +54,11 @@ export class MainLayout {
       label: 'Customers',
       path: '/customers',
       roles: ['Administrator', 'Sales Executive', 'Management']
+    },
+    {
+      label: 'AI Assistant',
+      path: '/ai-assistant',
+      roles: ['Administrator', 'Sales Executive', 'Purchase Executive', 'Management']
     }
   ];
 

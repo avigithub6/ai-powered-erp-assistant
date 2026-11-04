@@ -1,0 +1,149 @@
+<div class="ai-assistant">
+  <div class="page-heading">
+    <div>
+      <h1>AI Assistant</h1>
+      <p>Ask questions about your ERP business data</p>
+    </div>
+
+    <button
+      type="button"
+      class="clear-button"
+      (click)="clearResponse()"
+      [disabled]="loading()"
+    >
+      Clear
+    </button>
+  </div>
+
+  <section class="assistant-card">
+    <div class="assistant-intro">
+      <div class="assistant-icon">AI</div>
+      <div>
+        <h2>How can I help you?</h2>
+        <p>
+          Ask questions about sales, purchases, inventory,
+          products, vendors and business performance.
+        </p>
+      </div>
+    </div>
+
+    <div class="suggestions">
+      <p>Try asking:</p>
+
+      <button
+        type="button"
+        (click)="askSuggestion('Show dashboard summary')"
+        [disabled]="loading()"
+      >
+        Dashboard summary
+      </button>
+
+      <button
+        type="button"
+        (click)="askSuggestion('Show monthly sales trend')"
+        [disabled]="loading()"
+      >
+        Monthly sales trend
+      </button>
+
+      <button
+        type="button"
+        (click)="askSuggestion('Show top selling products')"
+        [disabled]="loading()"
+      >
+        Top selling products
+      </button>
+
+      <button
+        type="button"
+        (click)="askSuggestion('Show low stock items')"
+        [disabled]="loading()"
+      >
+        Low stock items
+      </button>
+
+      <button
+        type="button"
+        (click)="askSuggestion('Show top vendors')"
+        [disabled]="loading()"
+      >
+        Top vendors
+      </button>
+    </div>
+
+    <div class="question-input">
+      <label for="ai-question">Your question</label>
+
+      <textarea
+        id="ai-question"
+        rows="4"
+        maxlength="1000"
+        placeholder="Example: Show me all low stock items..."
+        [value]="question()"
+        (input)="question.set($any($event.target).value)"
+        (keydown.control.enter)="submitQuestion()"
+        (keydown.meta.enter)="submitQuestion()"
+        [disabled]="loading()"
+      ></textarea>
+
+      <div class="input-footer">
+        <span>{{ question().length }}/1000 characters</span>
+
+        <button
+          type="button"
+          class="send-button"
+          (click)="submitQuestion()"
+          [disabled]="loading() || !question().trim()"
+        >
+          {{ loading() ? 'Processing...' : 'Ask AI' }}
+        </button>
+      </div>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <section class="loading-message" aria-live="polite">
+      Processing your question. Please wait...
+    </section>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-message" role="alert">
+      {{ errorMessage() }}
+    </div>
+  }
+
+  @if (response(); as result) {
+    <section class="response-card">
+      <div class="response-heading">
+        <div>
+          <h2>AI Response</h2>
+          <p>Your ERP data-based answer</p>
+        </div>
+
+        <span class="source-badge">
+          {{ result.source === 'ollama' ? 'Ollama' : 'Fallback' }}
+        </span>
+      </div>
+
+      <div class="answer-content">
+        <h3>Answer</h3>
+        <p>{{ result.answer }}</p>
+      </div>
+
+      @if (result.tool_used) {
+        <div class="tool-information">
+          <span>Tool used:</span>
+          <strong>{{ result.tool_used }}</strong>
+        </div>
+      }
+
+      @if (result.data !== null && result.data !== undefined) {
+        <div class="structured-data">
+          <h3>Structured ERP Data</h3>
+          <pre>{{ result.data | json }}</pre>
+        </div>
+      }
+    </section>
+  }
+</div>
