@@ -1,4 +1,4 @@
-from typing import Literal
+﻿from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +17,8 @@ class ToolSelection(BaseModel):
         "top_vendors",
         "inventory",
         "low_stock",
+        "sales_purchase_comparison",
+        "vendor_search",
     ]
 
     arguments: ToolArguments = Field(default_factory=ToolArguments)

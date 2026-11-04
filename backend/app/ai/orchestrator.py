@@ -13,7 +13,34 @@ from app.schemas.ai import AIQueryResponse
 def fallback_tool(question: str) -> ToolSelection | None:
     text = question.lower()
 
-    if any(word in text for word in [
+    if (
+        any(word in text for word in ["compare", "comparison", "versus", " vs "])
+        and any(word in text for word in ["sales", "revenue"])
+        and any(word in text for word in ["purchase", "purchases", "procurement"])
+    ):
+        tool = "sales_purchase_comparison"
+
+    elif (
+        "steel" in text
+        and any(word in text for word in [
+            "vendor",
+            "supplier",
+            "delhi",
+            "ncr",
+            "gurugram",
+            "gurgaon",
+            "faridabad",
+            "noida",
+        ])
+    ) or any(word in text for word in [
+        "steel supplier",
+        "steel vendor",
+        "vendors supplying steel",
+        "suppliers supplying steel",
+    ]):
+        tool = "vendor_search"
+
+    elif any(word in text for word in [
         "low stock",
         "low-stock",
         "reorder",
@@ -76,7 +103,6 @@ def fallback_tool(question: str) -> ToolSelection | None:
         arguments={"limit": 5},
     )
 
-
 def format_answer(tool: str, data: dict | list) -> str:
     if tool == "dashboard_summary":
         parts = []
@@ -97,17 +123,81 @@ def format_answer(tool: str, data: dict | list) -> str:
 
         return "Dashboard summary: " + "; ".join(parts) + "."
 
+    if tool == "sales_purchase_comparison":
+        if not data:
+            return "No sales and purchase comparison data is available."
+
+        return (
+            f"Last {data['period_days']} days comparison "
+            f"({data['start_date']} to {data['end_date']}): "
+            f"Completed sales value: {data['sales_total']}; "
+            f"completed purchase value: {data['purchase_total']}; "
+            f"sales orders: {data['sales_order_count']}; "
+            f"purchase orders: {data['purchase_order_count']}."
+        )
+
+    if tool == "vendor_search":
+        if not data:
+            return "No steel vendors were found in Delhi NCR."
+
+        lines = [
+            (
+                f"{item['vendor_name']} "
+                f"(Address: {item['address']}): "
+                f"Supplied products: {item['supplied_products']}"
+            )
+            for item in data
+        ]
+
+        return "Steel vendors found in Delhi NCR: " + "; ".join(lines) + "."
     if tool == "sales_trend":
         if not data:
-            return "No completed sales trend data is available."
+            return "Insufficient data: no completed sales trend data is available."
 
         lines = [
             f"{item['month']}: {item['total_sales']}"
             for item in data
         ]
 
-        return "Monthly sales trend: " + "; ".join(lines) + "."
+        answer = "Monthly sales trend: " + "; ".join(lines) + "."
 
+        if len(data) < 2:
+            return (
+                answer
+                + " Insufficient data to identify an increase or decrease. "
+                + "Possible reasons cannot be confirmed from one month of sales data."
+            )
+
+        first_sales = float(data[0]["total_sales"])
+        last_sales = float(data[-1]["total_sales"])
+
+        if first_sales == 0:
+            return (
+                answer
+                + " Percentage change cannot be calculated because "
+                + "the first month's sales were zero. "
+                + "Possible reasons cannot be confirmed from sales figures alone."
+            )
+
+        percentage_change = (
+            (last_sales - first_sales) / first_sales
+        ) * 100
+
+        if percentage_change > 0:
+            trend = "increased"
+        elif percentage_change < 0:
+            trend = "decreased"
+        else:
+            trend = "remained unchanged"
+
+        return (
+            answer
+            + f" Sales {trend} by {abs(percentage_change):.2f}% "
+            + f"from {data[0]['month']} to {data[-1]['month']}. "
+            + "Possible reasons cannot be confirmed from sales figures alone; "
+            + "pricing, demand, stock availability, and marketing data "
+            + "would be needed."
+        )
     if tool == "top_products":
         if not data:
             return "No completed sales product data is available."

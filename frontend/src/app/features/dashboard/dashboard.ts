@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+﻿import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { DashboardService } from '../../core/services/dashboard.service';
@@ -19,6 +19,31 @@ export class Dashboard implements OnInit {
 
   ngOnInit(): void {
     this.loadDashboard();
+  }
+
+  getSalesBarWidth(value: number): number {
+    const items = this.data()?.salesTrend ?? [];
+    const maximum = Math.max(...items.map(item => Number(item.total_sales)), 0);
+
+    if (maximum <= 0) {
+      return 0;
+    }
+
+    return Math.max((Number(value) / maximum) * 100, 2);
+  }
+
+  getProductBarWidth(value: number): number {
+    const items = this.data()?.topProducts ?? [];
+    const maximum = Math.max(
+      ...items.map(item => Number(item.total_quantity_sold)),
+      0
+    );
+
+    if (maximum <= 0) {
+      return 0;
+    }
+
+    return Math.max((Number(value) / maximum) * 100, 2);
   }
 
   loadDashboard(): void {

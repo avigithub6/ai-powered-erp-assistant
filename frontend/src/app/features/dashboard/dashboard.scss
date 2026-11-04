@@ -135,3 +135,66 @@ td {
     padding: 14px;
   }
 }
+
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 0 24px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 160px) minmax(80px, 1fr) minmax(90px, 140px);
+  align-items: center;
+  gap: 12px;
+}
+
+.chart-label {
+  overflow: hidden;
+  color: #475569;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-track {
+  height: 14px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #e2e8f0;
+}
+
+.chart-bar {
+  height: 100%;
+  min-width: 0;
+  border-radius: 20px;
+  transition: width 0.3s ease;
+}
+
+.sales-bar {
+  background: #2563eb;
+}
+
+.product-bar {
+  background: #0d9488;
+}
+
+.chart-value {
+  color: #334155;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .chart-row {
+    grid-template-columns: 90px minmax(50px, 1fr);
+    gap: 8px;
+  }
+
+  .chart-value {
+    grid-column: 2;
+    text-align: left;
+  }
+}

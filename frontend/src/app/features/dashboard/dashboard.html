@@ -51,6 +51,24 @@
     @if (dashboard.salesTrend.length > 0) {
       <section class="data-section">
         <h2>Monthly Sales Trend</h2>
+
+        <div class="chart-container">
+          @for (item of dashboard.salesTrend; track item.month) {
+            <div class="chart-row">
+              <span class="chart-label">{{ item.month }}</span>
+              <div class="chart-track">
+                <div
+                  class="chart-bar sales-bar"
+                  [style.width.%]="getSalesBarWidth(item.total_sales)"
+                ></div>
+              </div>
+              <strong class="chart-value">
+                {{ item.total_sales | currency:'INR':'symbol':'1.0-0' }}
+              </strong>
+            </div>
+          }
+        </div>
+
         <div class="table-wrapper">
           <table>
             <thead>
@@ -75,6 +93,24 @@
     @if (dashboard.topProducts.length > 0) {
       <section class="data-section">
         <h2>Top Selling Products</h2>
+
+        <div class="chart-container">
+          @for (product of dashboard.topProducts; track product.inventory_id) {
+            <div class="chart-row">
+              <span class="chart-label">{{ product.item_name }}</span>
+              <div class="chart-track">
+                <div
+                  class="chart-bar product-bar"
+                  [style.width.%]="getProductBarWidth(product.total_quantity_sold)"
+                ></div>
+              </div>
+              <strong class="chart-value">
+                {{ product.total_quantity_sold }} units
+              </strong>
+            </div>
+          }
+        </div>
+
         <div class="table-wrapper">
           <table>
             <thead>

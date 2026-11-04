@@ -48,3 +48,16 @@ class VendorService:
             )
 
         return vendor
+
+    def search_steel_vendors(
+        self,
+        tenant_id: int,
+        role: str,
+        limit: int = 10,
+    ):
+        self.check_access(role)
+
+        return self.repository.search_steel_vendors(
+            tenant_id=tenant_id,
+            limit=limit,
+        )

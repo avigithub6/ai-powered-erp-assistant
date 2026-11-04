@@ -447,3 +447,53 @@ def test_ai_prompt_injection_cannot_access_another_tenant(
         item["item_name"] != "Product B"
         for item in items
     )
+
+from app.ai.orchestrator import format_answer
+
+
+def test_sales_trend_explains_increase():
+    data = [
+        {"month": "2026-09", "total_sales": 100.0},
+        {"month": "2026-10", "total_sales": 150.0},
+    ]
+
+    answer = format_answer("sales_trend", data)
+
+    assert "increased by 50.00%" in answer
+    assert "2026-09" in answer
+    assert "2026-10" in answer
+    assert "Possible reasons cannot be confirmed" in answer
+
+
+def test_sales_trend_explains_decrease():
+    data = [
+        {"month": "2026-09", "total_sales": 200.0},
+        {"month": "2026-10", "total_sales": 150.0},
+    ]
+
+    answer = format_answer("sales_trend", data)
+
+    assert "decreased by 25.00%" in answer
+
+
+def test_sales_trend_handles_single_month():
+    data = [
+        {"month": "2026-10", "total_sales": 150.0},
+    ]
+
+    answer = format_answer("sales_trend", data)
+
+    assert "Insufficient data" in answer
+    assert "increase or decrease" in answer
+
+
+def test_sales_trend_handles_zero_baseline():
+    data = [
+        {"month": "2026-09", "total_sales": 0.0},
+        {"month": "2026-10", "total_sales": 150.0},
+    ]
+
+    answer = format_answer("sales_trend", data)
+
+    assert "first month's sales were zero" in answer
+    assert "Percentage change cannot be calculated" in answer

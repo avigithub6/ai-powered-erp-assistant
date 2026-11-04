@@ -1,11 +1,13 @@
-from fastapi import HTTPException
+﻿from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.ai.tools.schemas import ToolSelection
 from app.repositories.dashboard_repository import DashboardRepository
 from app.repositories.inventory_repository import InventoryRepository
+from app.repositories.vendor_repository import VendorRepository
 from app.services.dashboard_service import DashboardService
 from app.services.inventory_service import InventoryService
+from app.services.vendor_service import VendorService
 
 INVENTORY_ALLOWED_FIELDS = {
     "id",
@@ -29,6 +31,10 @@ class ToolExecutor:
 
         self.inventory_service = InventoryService(
             InventoryRepository(db)
+        )
+
+        self.vendor_service = VendorService(
+            VendorRepository(db)
         )
 
     def execute(
@@ -61,6 +67,19 @@ class ToolExecutor:
 
         if tool == "top_vendors":
             return self.dashboard_service.get_top_vendors(
+                tenant_id,
+                role,
+                limit,
+            )
+
+        if tool == "sales_purchase_comparison":
+            return self.dashboard_service.get_sales_purchase_comparison(
+                tenant_id,
+                role,
+            )
+
+        if tool == "vendor_search":
+            return self.vendor_service.search_steel_vendors(
                 tenant_id,
                 role,
                 limit,

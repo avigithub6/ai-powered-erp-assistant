@@ -1,4 +1,6 @@
-﻿from sqlalchemy import extract, func, select
+﻿from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -23,9 +25,7 @@ class DashboardRepository:
         )
 
         total_purchase_value = self.db.scalar(
-            select(
-                func.coalesce(func.sum(PurchaseOrder.total_amount), 0)
-            ).where(
+            select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0)).where(
                 PurchaseOrder.tenant_id == tenant_id,
                 PurchaseOrder.status == "COMPLETED",
             )
@@ -147,13 +147,63 @@ class DashboardRepository:
                 PurchaseOrder.status == "COMPLETED",
             )
             .group_by(Vendor.id, Vendor.vendor_name)
-            .order_by(
-                func.sum(PurchaseOrder.total_amount).desc()
-            )
+            .order_by(func.sum(PurchaseOrder.total_amount).desc())
             .limit(limit)
         )
 
         return self.db.execute(statement).mappings().all()
+
+    def get_sales_purchase_comparison(self, tenant_id: int):
+        end_date = datetime.now(UTC)
+        start_date = end_date - timedelta(days=90)
+
+        sales = self.db.scalar(
+            select(func.coalesce(func.sum(SalesOrder.total_amount), 0)).where(
+                SalesOrder.tenant_id == tenant_id,
+                SalesOrder.status == "COMPLETED",
+                SalesOrder.order_date >= start_date,
+                SalesOrder.order_date <= end_date,
+            )
+        )
+
+        purchases = self.db.scalar(
+            select(
+                func.coalesce(func.sum(PurchaseOrder.total_amount), 0)
+            ).where(
+                PurchaseOrder.tenant_id == tenant_id,
+                PurchaseOrder.status == "COMPLETED",
+                PurchaseOrder.order_date >= start_date,
+                PurchaseOrder.order_date <= end_date,
+            )
+        )
+
+        sales_count = self.db.scalar(
+            select(func.count(SalesOrder.id)).where(
+                SalesOrder.tenant_id == tenant_id,
+                SalesOrder.status == "COMPLETED",
+                SalesOrder.order_date >= start_date,
+                SalesOrder.order_date <= end_date,
+            )
+        ) or 0
+
+        purchase_count = self.db.scalar(
+            select(func.count(PurchaseOrder.id)).where(
+                PurchaseOrder.tenant_id == tenant_id,
+                PurchaseOrder.status == "COMPLETED",
+                PurchaseOrder.order_date >= start_date,
+                PurchaseOrder.order_date <= end_date,
+            )
+        ) or 0
+
+        return {
+            "period_days": 90,
+            "sales_total": sales,
+            "purchase_total": purchases,
+            "sales_order_count": sales_count,
+            "purchase_order_count": purchase_count,
+            "start_date": start_date.date().isoformat(),
+            "end_date": end_date.date().isoformat(),
+        }
 
     def get_inventory(self, tenant_id: int, limit: int = 20, offset: int = 0):
         statement = (
