@@ -1,5 +1,5 @@
-
 import json
+import re
 
 import httpx
 
@@ -19,6 +19,59 @@ from app.ai.tools.schemas import (
 )
 from app.config import settings
 
+# Use Unicode code points to avoid source-file encoding problems.
+CURRENCY_SYMBOLS = "\u20b9\u0024\u20ac\u00a3\u00a5"
+
+CURRENCY_PATTERN = re.compile(
+    rf"(?i)(?:[{re.escape(CURRENCY_SYMBOLS)}]|\b(?:INR|USD|EUR|GBP|Rs\.?)\b)"
+)
+
+CURRENCY_PREFIX_PATTERN = re.compile(
+    rf"(?i)(?:[{re.escape(CURRENCY_SYMBOLS)}]|\b(?:INR|USD|EUR|GBP|Rs\.?)\b)"
+    rf"\s*(?=[\d(])"
+)
+
+CURRENCY_SUFFIX_PATTERN = re.compile(
+    r"(?i)(?<=\d)\s*\b(?:INR|USD|EUR|GBP|Rs\.?)\b"
+)
+
+
+def _has_explicit_currency(data: dict | list) -> bool:
+    """Check whether authorized backend data specifies a currency."""
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if (
+                key.casefold() in {"currency", "currency_code"}
+                and value is not None
+                and str(value).strip()
+            ):
+                return True
+
+            if isinstance(value, (dict, list)) and _has_explicit_currency(
+                value
+            ):
+                return True
+
+            if isinstance(value, str) and CURRENCY_PATTERN.search(value):
+                return True
+
+    elif isinstance(data, list):
+        return any(
+            _has_explicit_currency(item)
+            for item in data
+            if isinstance(item, (dict, list))
+        )
+
+    return False
+
+
+def _remove_unsupported_currency(answer: str) -> str:
+    """Remove currency labels when backend data has no currency."""
+    answer = CURRENCY_PREFIX_PATTERN.sub("", answer)
+    answer = CURRENCY_SUFFIX_PATTERN.sub("", answer)
+
+    return answer
+
 
 class OllamaClient:
     async def _request_structured(
@@ -26,7 +79,7 @@ class OllamaClient:
         system_prompt: str,
         user_content: str,
         response_schema: dict,
-        max_tokens: int = 250,
+        max_tokens: int = 400,
     ) -> dict:
         payload = {
             "model": settings.OLLAMA_MODEL,
@@ -132,8 +185,16 @@ class OllamaClient:
 
         filters = IntentFilters.model_validate(filter_data)
 
-        # Preserve status filters only for tools that support
-        # status-based filtering.
+        # A product name must never be reused as its category.
+        if (
+            entities.product_name
+            and filters.category
+            and entities.product_name.strip().casefold()
+            == filters.category.strip().casefold()
+        ):
+            filters.category = None
+
+        # Preserve status filters only for tools that support them.
         if classification.tool not in {"inventory", "vendor_search"}:
             filters.status = None
 
@@ -248,7 +309,7 @@ class OllamaClient:
                 },
             ],
             "options": {
-                "temperature": 0.2,
+                "temperature": 0,
                 "top_p": 0.8,
                 "seed": 42,
                 "num_predict": 250,
@@ -276,4 +337,10 @@ class OllamaClient:
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Ollama returned an empty answer")
 
-        return content.strip()
+        answer = content.strip()
+
+        # Currency must come from authorized backend data.
+        if not _has_explicit_currency(data):
+            answer = _remove_unsupported_currency(answer)
+
+        return answer
