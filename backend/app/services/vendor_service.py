@@ -1,4 +1,5 @@
-﻿from fastapi import HTTPException, status
+﻿
+from fastapi import HTTPException, status
 
 from app.core.permissions import ROLE_PERMISSIONS
 from app.repositories.vendor_repository import VendorRepository
@@ -48,6 +49,27 @@ class VendorService:
             )
 
         return vendor
+
+    def search_vendors(
+        self,
+        tenant_id: int,
+        role: str,
+        limit: int = 10,
+        vendor_name: str | None = None,
+        product_name: str | None = None,
+        category: str | None = None,
+        location: str | None = None,
+    ):
+        self.check_access(role)
+
+        return self.repository.search_vendors(
+            tenant_id=tenant_id,
+            limit=limit,
+            vendor_name=vendor_name,
+            product_name=product_name,
+            category=category,
+            location=location,
+        )
 
     def search_steel_vendors(
         self,

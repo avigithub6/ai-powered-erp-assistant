@@ -47,3 +47,7 @@ dist/
 # Local backups
 docs-backup-phase7/
 erp_before_expansion.sql
+*.backup
+
+# Temporary local AI test script
+backend/test_live_intents.py

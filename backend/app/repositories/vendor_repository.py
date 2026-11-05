@@ -1,4 +1,5 @@
-﻿from sqlalchemy import func, or_, select
+﻿
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Inventory, Vendor, VendorItem
@@ -29,6 +30,68 @@ class VendorRepository:
         ).all()
 
         return vendors, total
+
+    def search_vendors(
+        self,
+        tenant_id: int,
+        limit: int = 10,
+        vendor_name: str | None = None,
+        product_name: str | None = None,
+        category: str | None = None,
+        location: str | None = None,
+    ):
+        conditions = [Vendor.tenant_id == tenant_id]
+
+        if vendor_name:
+            conditions.append(
+                Vendor.vendor_name.ilike(f"%{vendor_name}%")
+            )
+
+        if product_name:
+            conditions.append(
+                Inventory.item_name.ilike(f"%{product_name}%")
+            )
+
+        if category:
+            conditions.append(
+                Inventory.category.ilike(f"%{category}%")
+            )
+
+        if location:
+            conditions.append(
+                Vendor.address.ilike(f"%{location}%")
+            )
+
+        statement = (
+            select(
+                Vendor.id.label("vendor_id"),
+                Vendor.vendor_name,
+                Vendor.address,
+                func.group_concat(
+                    func.distinct(Inventory.item_name)
+                ).label("supplied_products"),
+            )
+            .outerjoin(
+                VendorItem,
+                (VendorItem.vendor_id == Vendor.id)
+                & (VendorItem.tenant_id == Vendor.tenant_id),
+            )
+            .outerjoin(
+                Inventory,
+                (Inventory.id == VendorItem.inventory_id)
+                & (Inventory.tenant_id == VendorItem.tenant_id),
+            )
+            .where(*conditions)
+            .group_by(
+                Vendor.id,
+                Vendor.vendor_name,
+                Vendor.address,
+            )
+            .order_by(Vendor.vendor_name)
+            .limit(limit)
+        )
+
+        return self.db.execute(statement).mappings().all()
 
     def search_steel_vendors(self, tenant_id: int, limit: int = 10):
         location_filter = or_(

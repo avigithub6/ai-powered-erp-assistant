@@ -1,4 +1,5 @@
-﻿from fastapi import HTTPException, status
+﻿
+from fastapi import HTTPException, status
 
 from app.core.permissions import ROLE_PERMISSIONS
 from app.repositories.inventory_repository import InventoryRepository
@@ -41,11 +42,22 @@ class InventoryService:
         limit: int = 20,
         offset: int = 0,
         low_stock_only: bool = False,
+        product_name: str | None = None,
+        sku: str | None = None,
+        category: str | None = None,
+        is_active: bool | None = True,
     ):
         self.check_access(role)
 
         items, total = self.repository.list_items(
-            tenant_id, limit, offset, low_stock_only
+            tenant_id=tenant_id,
+            limit=limit,
+            offset=offset,
+            low_stock_only=low_stock_only,
+            product_name=product_name,
+            sku=sku,
+            category=category,
+            is_active=is_active,
         )
 
         return {

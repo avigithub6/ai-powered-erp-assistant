@@ -2,7 +2,7 @@
 import httpx
 import pytest
 from app.ai.llm.ollama_client import OllamaClient
-from app.ai.tools.schemas import ToolSelection
+from app.ai.tools.schemas import StructuredIntent
 from pydantic import ValidationError
 
 
@@ -25,13 +25,26 @@ def headers(client, username="admin_a", tenant_code="COMPANY_A"):
 
 
 def mock_tool(monkeypatch, tool, limit=5):
-    async def select_tool(self, question):
-        return {
-            "tool": tool,
-            "arguments": {"limit": limit},
-        }
+    async def understand_intent(self, question):
+        return StructuredIntent(
+            request_type="erp",
+            tool=tool,
+            arguments={"limit": limit},
+        )
 
-    monkeypatch.setattr(OllamaClient, "select_tool", select_tool)
+    async def generate_answer(self, question, tool, data):
+        return "Mocked ERP answer based on authorized data."
+
+    monkeypatch.setattr(
+        OllamaClient,
+        "understand_intent",
+        understand_intent,
+    )
+    monkeypatch.setattr(
+        OllamaClient,
+        "generate_answer",
+        generate_answer,
+    )
 
 
 def test_ai_top_products_returns_database_results(client, monkeypatch):
@@ -267,13 +280,15 @@ def test_ai_rejects_extra_request_fields(client):
 
 def test_ai_rejects_invalid_tool_limit():
     with pytest.raises(ValidationError):
-        ToolSelection(
+        StructuredIntent(
+            request_type="erp",
             tool="top_products",
             arguments={"limit": 100},
         )
 
     with pytest.raises(ValidationError):
-        ToolSelection(
+        StructuredIntent(
+            request_type="erp",
             tool="top_products",
             arguments={"limit": 0},
         )
@@ -281,7 +296,8 @@ def test_ai_rejects_invalid_tool_limit():
 
 def test_ai_rejects_unapproved_tool():
     with pytest.raises(ValidationError):
-        ToolSelection(
+        StructuredIntent(
+            request_type="erp",
             tool="execute_sql",
             arguments={"limit": 5},
         )
@@ -289,7 +305,8 @@ def test_ai_rejects_unapproved_tool():
 
 def test_ai_rejects_extra_tool_arguments():
     with pytest.raises(ValidationError):
-        ToolSelection.model_validate({
+        StructuredIntent.model_validate({
+            "request_type": "erp",
             "tool": "inventory",
             "arguments": {
                 "limit": 5,
@@ -301,13 +318,17 @@ def test_ai_rejects_extra_tool_arguments():
 def test_ai_unsupported_question_returns_safe_response(
     client, monkeypatch
 ):
-    async def unavailable_model(self, question):
-        raise httpx.ConnectError("Ollama unavailable")
+    async def classify_out_of_scope(self, question):
+        return StructuredIntent(
+            request_type="out_of_scope",
+            tool=None,
+            intent="general_question",
+        )
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        unavailable_model,
+        "understand_intent",
+        classify_out_of_scope,
     )
 
     response = client.post(
@@ -321,24 +342,33 @@ def test_ai_unsupported_question_returns_safe_response(
     data = response.json()
 
     assert data["tool_used"] is None
-    assert data["source"] == "fallback"
-    assert "could not identify" in data["answer"].lower()
+    assert data["source"] == "guardrail"
+    assert "erp-related questions" in data["answer"].lower()
     assert data["data"] is None
 
 
-def test_ai_invalid_model_limit_uses_safe_fallback(
+def test_ai_answer_generation_failure_uses_safe_fallback(
     client, monkeypatch
 ):
-    async def invalid_model(self, question):
-        return {
-            "tool": "top_products",
-            "arguments": {"limit": 100},
-        }
+    async def understand_intent(self, question):
+        return StructuredIntent(
+            request_type="erp",
+            tool="top_products",
+            arguments={"limit": 5},
+        )
+
+    async def unavailable_answer(self, question, tool, data):
+        raise httpx.ConnectError("Ollama unavailable")
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        invalid_model,
+        "understand_intent",
+        understand_intent,
+    )
+    monkeypatch.setattr(
+        OllamaClient,
+        "generate_answer",
+        unavailable_answer,
     )
 
     response = client.post(

@@ -5,201 +5,24 @@ from pydantic import ValidationError
 
 from app.ai.llm.ollama_client import OllamaClient
 from app.ai.tools.executor import ToolExecutor
-from app.ai.tools.schemas import ToolSelection
+from app.ai.tools.schemas import StructuredIntent
 from app.models import User
 from app.schemas.ai import AIQueryResponse
 
 
-def fallback_tool(question: str) -> ToolSelection | None:
-    text = " ".join(
-        question.lower().replace("-", " ").split()
-    )
-
-    # 1. Vendor search
-    if (
-        "steel" in text
-        and any(
-            word in text
-            for word in [
-                "vendor",
-                "vendors",
-                "supplier",
-                "suppliers",
-                "delhi",
-                "ncr",
-                "gurugram",
-                "gurgaon",
-                "faridabad",
-                "noida",
-            ]
-        )
-    ):
-        tool = "vendor_search"
-
-    # 2. Low stock and replenishment
-    elif any(
-        phrase in text
-        for phrase in [
-            "low stock",
-            "stock alert",
-            "stock below",
-            "below reorder",
-            "reorder",
-            "replenish",
-            "replenishment",
-            "need attention",
-            "needs attention",
-            "require attention",
-            "requires attention",
-            "inventory alert",
-            "items to restock",
-            "products to restock",
-        ]
-    ):
-        tool = "low_stock"
-
-    # 3. Explicit sales and purchase comparison
-    elif (
-        any(
-            phrase in text
-            for phrase in [
-                "compare",
-                "comparison",
-                "versus",
-                " vs ",
-                "difference between",
-                "higher than",
-                "greater than",
-                "lower than",
-                "less than",
-            ]
-        )
-        and any(
-            word in text
-            for word in ["sales", "sale", "revenue"]
-        )
-        and any(
-            word in text
-            for word in [
-                "purchase",
-                "purchases",
-                "procurement",
-            ]
-        )
-    ):
-        tool = "sales_purchase_comparison"
-
-    # 4. Monthly sales trends
-    elif any(
-        phrase in text
-        for phrase in [
-            "sales trend",
-            "monthly sales",
-            "monthly revenue",
-            "revenue trend",
-            "sales over time",
-            "sales performance",
-            "sales performing monthly",
-            "sales performance over time",
-            "overall sales trend",
-            "monthly sales performance",
-        ]
-    ):
-        tool = "sales_trend"
-
-    # 5. Vendor rankings
-    elif any(
-        phrase in text
-        for phrase in [
-            "top vendor",
-            "top vendors",
-            "best vendor",
-            "best vendors",
-            "vendor ranking",
-            "top supplier",
-            "top suppliers",
-            "best supplier",
-            "best suppliers",
-            "major supplier",
-            "major suppliers",
-            "highest purchase value",
-            "highest value vendors",
-            "highest value suppliers",
-            "highest purchasing vendors",
-        ]
-    ):
-        tool = "top_vendors"
-
-    # 6. Best-selling products
-    elif any(
-        phrase in text
-        for phrase in [
-            "top product",
-            "top products",
-            "best selling",
-            "best-selling",
-            "most sold",
-            "most popular products",
-            "highest selling",
-            "highest sales quantity",
-            "product sales ranking",
-            "selling products",
-        ]
-    ):
-        tool = "top_products"
-
-    # 7. General inventory
-    elif any(
-        phrase in text
-        for phrase in [
-            "inventory",
-            "stock level",
-            "stock levels",
-            "available stock",
-            "available items",
-            "inventory availability",
-            "item details",
-            "current stock",
-        ]
-    ):
-        tool = "inventory"
-
-    # 8. General business summary
-    elif any(
-        phrase in text
-        for phrase in [
-            "dashboard",
-            "summary",
-            "summarize",
-            "overview",
-            "business status",
-            "business performance",
-            "total sales",
-            "total sale",
-            "total revenue",
-            "total purchase",
-            "total procurement",
-            "purchase value",
-            "purchase summary",
-            "sales summary",
-            "customer activity",
-            "important business metrics",
-            "overall business",
-            "company performance",
-        ]
-    ):
-        tool = "dashboard_summary"
-
-    else:
-        return None
-
-    return ToolSelection(
-        tool=tool,
-        arguments={"limit": 5},
-    )
-
-
 def format_answer(tool: str, data: dict | list) -> str:
+    if tool == "sales_summary":
+        return (
+            f"Total completed sales value: "
+            f"{data['total_sales']}."
+        )
+
+    if tool == "purchase_summary":
+        return (
+            f"Total completed purchase value: "
+            f"{data['total_purchase_value']}."
+        )
+
     if tool == "dashboard_summary":
         parts = []
 
@@ -236,22 +59,19 @@ def format_answer(tool: str, data: dict | list) -> str:
 
     if tool == "vendor_search":
         if not data:
-            return "No steel vendors were found in Delhi NCR."
+            return "No vendors matched your search criteria."
 
         lines = [
             (
                 f"{item['vendor_name']} "
                 f"(Address: {item['address']}): "
-                f"Supplied products: {item['supplied_products']}"
+                f"Supplied products: "
+                f"{item['supplied_products'] or 'Not available'}"
             )
             for item in data
         ]
 
-        return (
-            "Steel vendors found in Delhi NCR: "
-            + "; ".join(lines)
-            + "."
-        )
+        return "Vendors found: " + "; ".join(lines) + "."
 
     if tool == "sales_trend":
         if not data:
@@ -379,19 +199,28 @@ class AIOrchestrator:
     def __init__(self):
         self.ollama_client = OllamaClient()
 
+    @staticmethod
+    def _response_metadata(intent: StructuredIntent):
+        return {
+            "intent": intent.intent,
+            "entities": intent.entities.model_dump(exclude_none=True),
+            "filters": intent.filters.model_dump(exclude_none=True),
+            "date_range": (
+                intent.date_range.model_dump(exclude_none=True)
+                if intent.date_range
+                else None
+            ),
+        }
+
     async def query(self, question: str, current_user: User, db):
-        selection = None
         source = "ollama"
 
-        # Primary path: Ollama selects the tool.
+        # Step 1: Extract structured intent using the LLM.
         try:
-            model_response = await self.ollama_client.select_tool(
-                question
-            )
+            intent = await self.ollama_client.understand_intent(question)
 
-            selection = ToolSelection.model_validate(
-                model_response
-            )
+            if not isinstance(intent, StructuredIntent):
+                intent = StructuredIntent.model_validate(intent)
 
         except (
             httpx.HTTPError,
@@ -399,37 +228,118 @@ class AIOrchestrator:
             ValidationError,
             TypeError,
         ):
-            # Recovery path: deterministic fallback.
-            selection = fallback_tool(question)
-            source = "fallback"
-
-        if selection is None:
             return AIQueryResponse(
                 answer=(
-                    "I could not identify this ERP request. "
-                    "Try asking about dashboard summary, sales trend, "
-                    "top products, top vendors, inventory, or low stock."
+                    "I could not understand the request right now. "
+                    "Please try again with a clear ERP-related question."
                 ),
-                source=source,
+                source="fallback",
             )
 
+        metadata = self._response_metadata(intent)
+
+        # Step 2: Handle out-of-scope requests.
+        if intent.request_type == "out_of_scope":
+            return AIQueryResponse(
+                answer=(
+                    "I can help with ERP-related questions about "
+                    "sales, purchases, vendors, inventory, products, "
+                    "and business reports."
+                ),
+                source="guardrail",
+                **metadata,
+            )
+
+        # Step 3: Ask for clarification when required.
+        if intent.needs_clarification:
+            return AIQueryResponse(
+                answer=intent.clarification_question
+                or "Please clarify your ERP request.",
+                source="ollama",
+                needs_clarification=True,
+                clarification_question=intent.clarification_question,
+                **metadata,
+            )
+
+        # Step 4: Reject unsupported vendor status filtering.
+        if (
+            intent.tool == "vendor_search"
+            and (
+                "vendor_status" in intent.unsupported_filters
+                or intent.filters.status is not None
+            )
+        ):
+            return AIQueryResponse(
+                answer=(
+                    "Vendor records mein active/inactive status "
+                    "available nahi hai, isliye status ke basis par "
+                    "filter nahi kar sakta. Aap vendor name, product "
+                    "category ya location se search kar sakte hain."
+                ),
+                tool_used=intent.tool,
+                source="guardrail",
+                **metadata,
+            )
+
+        # Step 5: Reject any other unsupported filters.
+        if intent.unsupported_filters:
+            return AIQueryResponse(
+                answer=(
+                    "Your request contains a filter that is not "
+                    "currently supported. Please remove that filter "
+                    "and try again."
+                ),
+                tool_used=intent.tool,
+                source="guardrail",
+                **metadata,
+            )
+
+        if intent.tool is None:
+            return AIQueryResponse(
+                answer=(
+                    "I could not identify the ERP operation. "
+                    "Please clarify what information you need."
+                ),
+                source="guardrail",
+                needs_clarification=True,
+                **metadata,
+            )
+
+        # Step 6: Execute only the approved structured intent.
+        # Tenant ID and role always come from authenticated user context.
         executor = ToolExecutor(db)
 
-        # Backend independently enforces permissions and tenant scope.
         result = executor.execute(
-            selection=selection,
+            intent=intent,
             tenant_id=current_user.tenant_id,
             role=current_user.role,
         )
 
         safe_data = jsonable_encoder(result)
 
-        return AIQueryResponse(
-            answer=format_answer(
-                selection.tool,
+        # Step 7: Generate an answer using verified database results.
+        try:
+            answer = await self.ollama_client.generate_answer(
+                question=question,
+                tool=intent.tool,
+                data=safe_data,
+            )
+
+        except (
+            httpx.HTTPError,
+            ValueError,
+            TypeError,
+        ):
+            answer = format_answer(
+                intent.tool,
                 safe_data,
-            ),
-            tool_used=selection.tool,
+            )
+            source = "fallback"
+
+        return AIQueryResponse(
+            answer=answer,
+            tool_used=intent.tool,
             source=source,
             data=safe_data,
+            **metadata,
         )

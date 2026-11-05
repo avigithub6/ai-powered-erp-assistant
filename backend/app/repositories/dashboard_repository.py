@@ -1,4 +1,5 @@
-﻿from datetime import UTC, datetime, timedelta
+﻿
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
@@ -16,26 +17,54 @@ class DashboardRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_summary(self, tenant_id: int):
+    @staticmethod
+    def _date_filters(column, start_date=None, end_date=None):
+        conditions = []
+
+        if start_date is not None:
+            conditions.append(column >= start_date)
+
+        if end_date is not None:
+            conditions.append(column < end_date + timedelta(days=1))
+
+        return conditions
+
+    def get_summary(
+        self,
+        tenant_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ):
+        sales_conditions = [
+            SalesOrder.tenant_id == tenant_id,
+            SalesOrder.status == "COMPLETED",
+            *self._date_filters(
+                SalesOrder.order_date, start_date, end_date
+            ),
+        ]
+
+        purchase_conditions = [
+            PurchaseOrder.tenant_id == tenant_id,
+            PurchaseOrder.status == "COMPLETED",
+            *self._date_filters(
+                PurchaseOrder.order_date, start_date, end_date
+            ),
+        ]
+
         total_sales = self.db.scalar(
-            select(func.coalesce(func.sum(SalesOrder.total_amount), 0)).where(
-                SalesOrder.tenant_id == tenant_id,
-                SalesOrder.status == "COMPLETED",
-            )
+            select(
+                func.coalesce(func.sum(SalesOrder.total_amount), 0)
+            ).where(*sales_conditions)
         )
 
         total_purchase_value = self.db.scalar(
-            select(func.coalesce(func.sum(PurchaseOrder.total_amount), 0)).where(
-                PurchaseOrder.tenant_id == tenant_id,
-                PurchaseOrder.status == "COMPLETED",
-            )
+            select(
+                func.coalesce(func.sum(PurchaseOrder.total_amount), 0)
+            ).where(*purchase_conditions)
         )
 
         sales_order_count = self.db.scalar(
-            select(func.count(SalesOrder.id)).where(
-                SalesOrder.tenant_id == tenant_id,
-                SalesOrder.status == "COMPLETED",
-            )
+            select(func.count(SalesOrder.id)).where(*sales_conditions)
         ) or 0
 
         inventory_item_count = self.db.scalar(
@@ -61,7 +90,49 @@ class DashboardRepository:
             "low_stock_count": low_stock_count,
         }
 
-    def get_sales_trend(self, tenant_id: int, limit: int = 120):
+    def get_total_sales(
+        self,
+        tenant_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ):
+        return self.db.scalar(
+            select(
+                func.coalesce(func.sum(SalesOrder.total_amount), 0)
+            ).where(
+                SalesOrder.tenant_id == tenant_id,
+                SalesOrder.status == "COMPLETED",
+                *self._date_filters(
+                    SalesOrder.order_date, start_date, end_date
+                ),
+            )
+        )
+
+    def get_total_purchases(
+        self,
+        tenant_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ):
+        return self.db.scalar(
+            select(
+                func.coalesce(func.sum(PurchaseOrder.total_amount), 0)
+            ).where(
+                PurchaseOrder.tenant_id == tenant_id,
+                PurchaseOrder.status == "COMPLETED",
+                *self._date_filters(
+                    PurchaseOrder.order_date, start_date, end_date
+                ),
+            )
+        )
+
+    def get_sales_trend(
+        self,
+        tenant_id: int,
+        limit: int = 120,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ):
         year = extract("year", SalesOrder.order_date)
         month = extract("month", SalesOrder.order_date)
 
@@ -74,6 +145,9 @@ class DashboardRepository:
             .where(
                 SalesOrder.tenant_id == tenant_id,
                 SalesOrder.status == "COMPLETED",
+                *self._date_filters(
+                    SalesOrder.order_date, start_date, end_date
+                ),
             )
             .group_by(year, month)
             .order_by(year, month)
@@ -90,7 +164,13 @@ class DashboardRepository:
             for row in rows
         ]
 
-    def get_top_products(self, tenant_id: int, limit: int = 5):
+    def get_top_products(
+        self,
+        tenant_id: int,
+        limit: int = 5,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ):
         statement = (
             select(
                 Inventory.id.label("inventory_id"),
@@ -115,6 +195,9 @@ class DashboardRepository:
                 SalesOrderItem.tenant_id == tenant_id,
                 SalesOrder.tenant_id == tenant_id,
                 SalesOrder.status == "COMPLETED",
+                *self._date_filters(
+                    SalesOrder.order_date, start_date, end_date
+                ),
             )
             .group_by(
                 Inventory.id,
@@ -127,7 +210,13 @@ class DashboardRepository:
 
         return self.db.execute(statement).mappings().all()
 
-    def get_top_vendors(self, tenant_id: int, limit: int = 5):
+    def get_top_vendors(
+        self,
+        tenant_id: int,
+        limit: int = 5,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ):
         statement = (
             select(
                 Vendor.id.label("vendor_id"),
@@ -145,6 +234,9 @@ class DashboardRepository:
                 Vendor.tenant_id == tenant_id,
                 PurchaseOrder.tenant_id == tenant_id,
                 PurchaseOrder.status == "COMPLETED",
+                *self._date_filters(
+                    PurchaseOrder.order_date, start_date, end_date
+                ),
             )
             .group_by(Vendor.id, Vendor.vendor_name)
             .order_by(func.sum(PurchaseOrder.total_amount).desc())
@@ -158,7 +250,9 @@ class DashboardRepository:
         start_date = end_date - timedelta(days=90)
 
         sales = self.db.scalar(
-            select(func.coalesce(func.sum(SalesOrder.total_amount), 0)).where(
+            select(
+                func.coalesce(func.sum(SalesOrder.total_amount), 0)
+            ).where(
                 SalesOrder.tenant_id == tenant_id,
                 SalesOrder.status == "COMPLETED",
                 SalesOrder.order_date >= start_date,

@@ -4,11 +4,11 @@ from app.api.v1.ai import router as ai_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.customers import router as customers_router
 from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.erp_integration import router as erp_integration_router
 from app.api.v1.inventory import router as inventory_router
 from app.api.v1.purchases import router as purchases_router
 from app.api.v1.sales import router as sales_router
 from app.api.v1.vendors import router as vendors_router
-from app.api.v1.erp_integration import router as erp_integration_router
 from app.config import settings
 
 app = FastAPI(

@@ -1,4 +1,5 @@
-﻿from sqlalchemy import func, select
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Inventory
@@ -14,26 +15,41 @@ class InventoryRepository:
         limit: int = 20,
         offset: int = 0,
         low_stock_only: bool = False,
+        product_name: str | None = None,
+        sku: str | None = None,
+        category: str | None = None,
+        is_active: bool | None = True,
     ):
-        query = select(Inventory).where(
-            Inventory.tenant_id == tenant_id,
-            Inventory.is_active.is_(True),
-        )
+        conditions = [Inventory.tenant_id == tenant_id]
 
-        count_query = select(func.count(Inventory.id)).where(
-            Inventory.tenant_id == tenant_id,
-            Inventory.is_active.is_(True),
-        )
+        if is_active is not None:
+            conditions.append(Inventory.is_active.is_(is_active))
 
         if low_stock_only:
-            condition = Inventory.stock_level <= Inventory.reorder_level
-            query = query.where(condition)
-            count_query = count_query.where(condition)
+            conditions.append(
+                Inventory.stock_level <= Inventory.reorder_level
+            )
 
-        total = self.db.scalar(count_query) or 0
+        if product_name:
+            conditions.append(
+                Inventory.item_name.ilike(f"%{product_name}%")
+            )
+
+        if sku:
+            conditions.append(Inventory.sku.ilike(f"%{sku}%"))
+
+        if category:
+            conditions.append(Inventory.category.ilike(f"%{category}%"))
+
+        statement = select(Inventory).where(*conditions)
+        count_statement = (
+            select(func.count(Inventory.id)).where(*conditions)
+        )
+
+        total = self.db.scalar(count_statement) or 0
 
         items = self.db.scalars(
-            query.order_by(Inventory.item_name)
+            statement.order_by(Inventory.item_name)
             .limit(limit)
             .offset(offset)
         ).all()

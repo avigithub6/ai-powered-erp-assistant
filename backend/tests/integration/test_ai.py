@@ -1,5 +1,8 @@
+
 import httpx
-from app.ai.orchestrator import AIOrchestrator, OllamaClient, format_answer
+from app.ai.llm.ollama_client import OllamaClient
+from app.ai.orchestrator import AIOrchestrator, format_answer
+from app.ai.tools.schemas import StructuredIntent
 from app.core.permissions import ROLE_PERMISSIONS
 from app.models import AIQueryAudit
 from fastapi import HTTPException
@@ -28,18 +31,33 @@ def auth_headers(client, username, tenant_code="COMPANY_A"):
     }
 
 
-def test_ai_dashboard_summary(client, monkeypatch):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "dashboard_summary",
-            "arguments": {"limit": 5},
-        }
+def mock_ai_intent(monkeypatch, tool, limit=5, **intent_kwargs):
+    async def mock_understand_intent(self, question):
+        return StructuredIntent(
+            request_type="erp",
+            tool=tool,
+            arguments={"limit": limit},
+            **intent_kwargs,
+        )
+
+    async def mock_generate_answer(self, question, tool, data):
+        return "Mocked ERP answer based on authorized data."
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        mock_select_tool,
+        "understand_intent",
+        mock_understand_intent,
     )
+
+    monkeypatch.setattr(
+        OllamaClient,
+        "generate_answer",
+        mock_generate_answer,
+    )
+
+
+def test_ai_dashboard_summary(client, monkeypatch):
+    mock_ai_intent(monkeypatch, "dashboard_summary")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -58,17 +76,7 @@ def test_ai_dashboard_summary(client, monkeypatch):
 
 
 def test_ai_sales_user_cannot_see_purchase_total(client, monkeypatch):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "dashboard_summary",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "dashboard_summary")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -85,17 +93,7 @@ def test_ai_sales_user_cannot_see_purchase_total(client, monkeypatch):
 
 
 def test_ai_sales_user_cannot_access_top_vendors(client, monkeypatch):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "top_vendors",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "top_vendors")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -110,17 +108,7 @@ def test_ai_purchase_user_cannot_access_sales_trend(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "sales_trend",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "sales_trend")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -135,17 +123,7 @@ def test_ai_inventory_returns_only_approved_fields(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "inventory",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "inventory")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -180,17 +158,7 @@ def test_ai_company_b_inventory_is_tenant_scoped(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "inventory",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "inventory")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -217,13 +185,13 @@ def test_ai_uses_fallback_when_ollama_is_unavailable(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
+    async def mock_understand_intent(self, question):
         raise httpx.ConnectError("Ollama unavailable")
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        mock_select_tool,
+        "understand_intent",
+        mock_understand_intent,
     )
 
     response = client.post(
@@ -237,24 +205,25 @@ def test_ai_uses_fallback_when_ollama_is_unavailable(
     data = response.json()
 
     assert data["source"] == "fallback"
-    assert data["tool_used"] == "low_stock"
-    assert data["data"]["total"] == 1
+    assert data["tool_used"] is None
+    assert data.get("data") is None
 
 
 def test_ai_uses_fallback_for_invalid_model_tool(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
+    async def mock_understand_intent(self, question):
         return {
+            "request_type": "erp",
             "tool": "execute_sql",
             "arguments": {"limit": 5},
         }
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        mock_select_tool,
+        "understand_intent",
+        mock_understand_intent,
     )
 
     response = client.post(
@@ -268,7 +237,7 @@ def test_ai_uses_fallback_for_invalid_model_tool(
     data = response.json()
 
     assert data["source"] == "fallback"
-    assert data["tool_used"] == "dashboard_summary"
+    assert data["tool_used"] is None
 
 
 def test_ai_requires_authentication(client):
@@ -289,17 +258,31 @@ def test_ai_rejects_empty_question(client):
 
     assert response.status_code == 422
 
+
 def test_ai_purchase_summary_uses_dashboard_fallback(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
+    async def mock_understand_intent(self, question):
+        return StructuredIntent(
+            request_type="erp",
+            tool="purchase_summary",
+            arguments={"limit": 5},
+        )
+
+    async def mock_generate_answer(self, question, tool, data):
         raise httpx.ConnectError("Ollama unavailable")
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        mock_select_tool,
+        "understand_intent",
+        mock_understand_intent,
+    )
+
+    monkeypatch.setattr(
+        OllamaClient,
+        "generate_answer",
+        mock_generate_answer,
     )
 
     response = client.post(
@@ -313,7 +296,7 @@ def test_ai_purchase_summary_uses_dashboard_fallback(
     data = response.json()
 
     assert data["source"] == "fallback"
-    assert data["tool_used"] == "dashboard_summary"
+    assert data["tool_used"] == "purchase_summary"
     assert data["data"]["total_purchase_value"] == 120.0
 
 
@@ -321,13 +304,13 @@ def test_ai_uses_fallback_for_malformed_model_selection(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
+    async def mock_understand_intent(self, question):
         return ["invalid", "model", "response"]
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        mock_select_tool,
+        "understand_intent",
+        mock_understand_intent,
     )
 
     response = client.post(
@@ -341,22 +324,24 @@ def test_ai_uses_fallback_for_malformed_model_selection(
     data = response.json()
 
     assert data["source"] == "fallback"
-    assert data["tool_used"] == "dashboard_summary"
+    assert data["tool_used"] is None
+
 
 def test_ai_prompt_injection_cannot_select_unapproved_tool(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "execute_sql",
-            "arguments": {"limit": 5},
-        }
+    async def mock_understand_intent(self, question):
+        return StructuredIntent(
+            request_type="out_of_scope",
+            tool=None,
+            intent="unapproved SQL execution request",
+        )
 
     monkeypatch.setattr(
         OllamaClient,
-        "select_tool",
-        mock_select_tool,
+        "understand_intent",
+        mock_understand_intent,
     )
 
     response = client.post(
@@ -374,27 +359,16 @@ def test_ai_prompt_injection_cannot_select_unapproved_tool(
 
     data = response.json()
 
-    assert data["source"] == "fallback"
     assert data["tool_used"] is None
     assert data.get("data") is None
-    assert "could not identify" in data["answer"].lower()
+    assert data["source"] in {"guardrail", "fallback"}
 
 
 def test_ai_prompt_injection_cannot_bypass_sales_permissions(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "top_vendors",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "top_vendors")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -414,17 +388,7 @@ def test_ai_prompt_injection_cannot_access_another_tenant(
     client,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "inventory",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "inventory")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -505,17 +469,7 @@ def test_ai_successful_query_creates_audit_record(
     db_session,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "dashboard_summary",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "dashboard_summary")
 
     response = client.post(
         "/api/v1/ai/query",
@@ -587,17 +541,7 @@ def test_ai_audit_records_are_tenant_scoped(
     db_session,
     monkeypatch,
 ):
-    async def mock_select_tool(self, question):
-        return {
-            "tool": "dashboard_summary",
-            "arguments": {"limit": 5},
-        }
-
-    monkeypatch.setattr(
-        OllamaClient,
-        "select_tool",
-        mock_select_tool,
-    )
+    mock_ai_intent(monkeypatch, "dashboard_summary")
 
     response = client.post(
         "/api/v1/ai/query",
